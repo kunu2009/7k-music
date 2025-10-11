@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
@@ -28,11 +27,13 @@ export function NowPlayingPage() {
     previous,
     seekTo,
     queue,
+    shuffle,
+    repeat,
+    toggleShuffle,
+    toggleRepeat,
   } = usePlayer();
 
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
-  const [shuffleMode, setShuffleMode] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
 
   if (!currentVideo) {
     navigate('/');
@@ -143,9 +144,9 @@ export function NowPlayingPage() {
         {/* Secondary Controls */}
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={() => setShuffleMode(!shuffleMode)}
+            onClick={toggleShuffle}
             className={`p-2 rounded-full transition ${
-              shuffleMode ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
+              shuffle ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
             }`}
           >
             <Shuffle className="w-5 h-5" />
@@ -161,17 +162,13 @@ export function NowPlayingPage() {
           </button>
 
           <button
-            onClick={() => {
-              const modes: Array<'off' | 'all' | 'one'> = ['off', 'all', 'one'];
-              const currentIndex = modes.indexOf(repeatMode);
-              setRepeatMode(modes[(currentIndex + 1) % modes.length]);
-            }}
-            className={`p-2 rounded-full transition ${
-              repeatMode !== 'off' ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
+            onClick={toggleRepeat}
+            className={`p-2 rounded-full transition relative ${
+              repeat !== 'off' ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
             }`}
           >
             <Repeat className="w-5 h-5" />
-            {repeatMode === 'one' && (
+            {repeat === 'one' && (
               <span className="absolute top-0 right-0 w-2 h-2 bg-[#a4d96c] rounded-full" />
             )}
           </button>

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
 import { Navigation } from '@/components/Navigation';
 import { MiniPlayer } from '@/components/MiniPlayer';
@@ -14,6 +14,7 @@ import { CategoriesPage } from '@/pages/CategoriesPage';
 import { useFavorites } from '@/hooks/useStorage';
 
 function PlayerWrapper() {
+  const location = useLocation();
   const {
     currentVideo,
     isPlaying,
@@ -30,6 +31,9 @@ function PlayerWrapper() {
 
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const hasInitialized = useRef(false);
+  
+  // Check if we're on the Now Playing page
+  const isNowPlayingPage = location.pathname === '/now-playing';
 
   useEffect(() => {
     // Only initialize once!
@@ -79,8 +83,8 @@ function PlayerWrapper() {
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
 
-      {/* Mini Player */}
-      {currentVideo && (
+      {/* Mini Player - Hide on Now Playing page */}
+      {currentVideo && !isNowPlayingPage && (
         <MiniPlayer
           video={currentVideo}
           isPlaying={isPlaying}

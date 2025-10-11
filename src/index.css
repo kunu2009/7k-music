@@ -68,3 +68,13 @@ body {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
+
+/* Hide scrollbar */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
