@@ -114,6 +114,23 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
           },
           onError: (event) => {
             console.error('YouTube Player Error:', event.data);
+            // Error codes:
+            // 2 – Invalid video ID
+            // 5 – HTML5 player error
+            // 100 – Video not found or private
+            // 101/150 – Video not allowed to be played in embedded players
+            
+            const errorMessages: { [key: number]: string } = {
+              2: 'Invalid video ID - The video cannot be played',
+              5: 'HTML5 player error',
+              100: 'Video not found or is private',
+              101: 'Video cannot be embedded',
+              150: 'Video cannot be embedded',
+            };
+            
+            const message = errorMessages[event.data] || 'Unknown error';
+            console.error(`❌ YouTube Error ${event.data}: ${message}`);
+            
             options.onError?.(event.data);
             setIsPlaying(false);
           },

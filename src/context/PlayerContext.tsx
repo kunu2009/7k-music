@@ -49,6 +49,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     currentTime,
     duration,
     apiReady,
+    isReady,
     initializePlayer,
     play,
     pause,
@@ -73,7 +74,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const playVideo = (video: YouTubeVideo, newQueue?: YouTubeVideo[]) => {
-    console.log('🎵 Playing video:', video.title, 'API Ready:', apiReady);
+    console.log('🎵 Playing video:', video.title, 'API Ready:', apiReady, 'Player Ready:', isReady);
     
     setCurrentVideo(video);
     
@@ -89,21 +90,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
     
-    // Wait for API to be ready before loading video
-    if (!apiReady) {
-      console.warn('⚠️ YouTube API not ready yet, waiting...');
-      // Store the video to play once ready
+    // Wait for both API and Player to be ready
+    if (!apiReady || !isReady) {
+      console.warn('⚠️ Player not ready yet, waiting... API:', apiReady, 'Player:', isReady);
+      
+      // Wait for player to be ready
       const checkReady = setInterval(() => {
-        if (apiReady) {
+        if (apiReady && isReady) {
           clearInterval(checkReady);
-          console.log('✅ API now ready, loading video');
+          console.log('✅ Player now ready, loading video:', video.title);
           loadVideo(video, true);
         }
       }, 100);
       
-      // Timeout after 5 seconds
-      setTimeout(() => clearInterval(checkReady), 5000);
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkReady);
+        console.error('❌ Timeout waiting for player to be ready');
+      }, 10000);
     } else {
+      console.log('✅ Player ready, loading video immediately');
       loadVideo(video, true);
     }
     
