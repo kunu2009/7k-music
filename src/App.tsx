@@ -3,10 +3,14 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
 import { Navigation } from '@/components/Navigation';
 import { MiniPlayer } from '@/components/MiniPlayer';
+import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { HomePage } from '@/pages/HomePage';
 import { SearchPage } from '@/pages/SearchPage';
 import { FavoritesPage } from '@/pages/FavoritesPage';
 import { PlaylistsPage } from '@/pages/PlaylistsPage';
+import { MyMusicPage } from '@/pages/MyMusicPage';
+import { NowPlayingPage } from '@/pages/NowPlayingPage';
+import { CategoriesPage } from '@/pages/CategoriesPage';
 import { useFavorites } from '@/hooks/useStorage';
 
 function PlayerWrapper() {
@@ -67,7 +71,13 @@ function PlayerWrapper() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/playlists" element={<PlaylistsPage />} />
+        <Route path="/my-music" element={<MyMusicPage />} />
+        <Route path="/now-playing" element={<NowPlayingPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
       </Routes>
+
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
 
       {/* Mini Player */}
       {currentVideo && (

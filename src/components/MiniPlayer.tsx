@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { YouTubeVideo } from '@/types';
 import { Play, Pause, SkipBack, SkipForward, Heart, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 
@@ -33,6 +34,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   isMuted = false,
   onExpand,
 }) => {
+  const navigate = useNavigate();
+  
   if (!video) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -71,7 +74,10 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Video Info */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div 
+            className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:bg-white/5 rounded-lg p-2 -m-2 transition"
+            onClick={() => navigate('/now-playing')}
+          >
             <img
               src={video.thumbnails.default}
               alt={video.title}
@@ -148,7 +154,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
             {onExpand && (
               <button
-                onClick={onExpand}
+                onClick={() => navigate('/now-playing')}
                 className="p-2 hover:bg-chathams-blue rounded-full transition-colors hidden md:block"
                 aria-label="Expand player"
               >

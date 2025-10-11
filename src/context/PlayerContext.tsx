@@ -10,6 +10,8 @@ interface PlayerContextType {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  shuffle: boolean;
+  repeat: 'off' | 'one' | 'all';
   playVideo: (video: YouTubeVideo, queue?: YouTubeVideo[]) => void;
   playPause: () => void;
   next: () => void;
@@ -17,6 +19,8 @@ interface PlayerContextType {
   seekTo: (time: number) => void;
   toggleMute: () => void;
   isMuted: boolean;
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
   addToQueue: (video: YouTubeVideo) => void;
   initPlayer: (elementId: string) => void;
 }
@@ -36,6 +40,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [queue, setQueue] = useState<YouTubeVideo[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
+  const [shuffledQueue, setShuffledQueue] = useState<YouTubeVideo[]>([]);
 
   const {
     isPlaying,
@@ -50,6 +57,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toggleMute: playerToggleMute,
   } = useYouTubePlayer({
     onVideoEnd: () => {
+      // Handle repeat one
+      if (repeat === 'one' && currentVideo) {
+        loadVideo(currentVideo, true);
+        return;
+      }
+      
       // Auto-play next video
       next();
     },
@@ -68,6 +81,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setQueue(newQueue);
       const index = newQueue.findIndex(v => v.id === video.id);
       setCurrentIndex(index >= 0 ? index : 0);
+      
+      // Create shuffled queue if shuffle is enabled
+      if (shuffle) {
+        const shuffled = [...newQueue].sort(() => Math.random() - 0.5);
+        setShuffledQueue(shuffled);
+      }
     }
     
     // Wait for API to be ready before loading video
@@ -110,9 +129,19 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const next = () => {
     if (queue.length === 0) return;
     
-    const nextIndex = (currentIndex + 1) % queue.length;
+    const activeQueue = shuffle ? shuffledQueue : queue;
+    if (activeQueue.length === 0) return;
+    
+    // Handle repeat all - loop back to start
+    const nextIndex = (currentIndex + 1) >= activeQueue.length 
+      ? (repeat === 'all' ? 0 : currentIndex)
+      : (currentIndex + 1);
+    
+    // If we're at the end and not repeating all, don't play
+    if (nextIndex === currentIndex && repeat !== 'all') return;
+    
     setCurrentIndex(nextIndex);
-    const nextVideo = queue[nextIndex];
+    const nextVideo = activeQueue[nextIndex];
     setCurrentVideo(nextVideo);
     loadVideo(nextVideo, true);
     storage.addToRecentlyPlayed(nextVideo).catch(console.error);
@@ -121,9 +150,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const previous = () => {
     if (queue.length === 0) return;
     
-    const prevIndex = currentIndex === 0 ? queue.length - 1 : currentIndex - 1;
+    const activeQueue = shuffle ? shuffledQueue : queue;
+    if (activeQueue.length === 0) return;
+    
+    const prevIndex = currentIndex === 0 ? activeQueue.length - 1 : currentIndex - 1;
     setCurrentIndex(prevIndex);
-    const prevVideo = queue[prevIndex];
+    const prevVideo = activeQueue[prevIndex];
     setCurrentVideo(prevVideo);
     loadVideo(prevVideo, true);
     storage.addToRecentlyPlayed(prevVideo).catch(console.error);
@@ -142,6 +174,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setQueue(prev => [...prev, video]);
   };
 
+  const toggleShuffle = () => {
+    const newShuffle = !shuffle;
+    setShuffle(newShuffle);
+    
+    if (newShuffle && queue.length > 0) {
+      // Create shuffled version of current queue
+      const shuffled = [...queue].sort(() => Math.random() - 0.5);
+      setShuffledQueue(shuffled);
+    }
+  };
+
+  const toggleRepeat = () => {
+    setRepeat(prev => {
+      if (prev === 'off') return 'all';
+      if (prev === 'all') return 'one';
+      return 'off';
+    });
+  };
+
   const value: PlayerContextType = {
     currentVideo,
     queue,
@@ -149,6 +200,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isPlaying,
     currentTime,
     duration,
+    shuffle,
+    repeat,
     playVideo,
     playPause,
     next,
@@ -156,6 +209,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     seekTo,
     toggleMute,
     isMuted,
+    toggleShuffle,
+    toggleRepeat,
     addToQueue,
     initPlayer,
   };

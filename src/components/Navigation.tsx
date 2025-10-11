@@ -1,13 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Heart, Library, Music } from 'lucide-react';
+import { Home, Search, Heart, Library, Music, Sparkles } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
   const navItems = [
     { to: '/', icon: Home, label: 'Home' },
     { to: '/search', icon: Search, label: 'Search' },
+    { to: '/my-music', icon: Library, label: 'My Music' },
+    { to: '/categories', icon: Sparkles, label: 'Categories' },
     { to: '/favorites', icon: Heart, label: 'Favorites' },
-    { to: '/playlists', icon: Library, label: 'Playlists' },
   ];
 
   return (
