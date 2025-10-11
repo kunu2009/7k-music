@@ -1,6 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { YouTubeVideo } from '@/types';
-import { youtubeApi } from '@/utils/youtube';
 import { Play, Pause, SkipBack, SkipForward, Heart, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 
 interface MiniPlayerProps {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, createContext, useContext } from 'react';
 import { YouTubeVideo } from '@/types';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { storage } from '@/utils/storage';
