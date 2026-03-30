@@ -1,20 +1,22 @@
 import React from 'react';
 import { YouTubeVideo } from '@/types';
 import { youtubeApi } from '@/utils/youtube';
-import { Heart, Play, MoreVertical } from 'lucide-react';
+import { Heart, Play, ListPlus } from 'lucide-react';
 
 interface VideoCardProps {
   video: YouTubeVideo;
   onPlay: (video: YouTubeVideo) => void;
   onFavorite?: (video: YouTubeVideo) => void;
   isFavorite?: boolean;
+  onAddToPlaylist?: (video: YouTubeVideo) => void;
 }
 
 export const VideoCard: React.FC<VideoCardProps> = ({ 
   video, 
   onPlay, 
   onFavorite,
-  isFavorite = false 
+  isFavorite = false,
+  onAddToPlaylist,
 }) => {
   return (
     <div className="group relative bg-gable-green rounded-lg overflow-hidden hover:bg-chathams-blue transition-all duration-300 cursor-pointer">
@@ -79,12 +81,18 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               </button>
             )}
             
-            <button
-              className="p-1.5 hover:bg-calypso rounded-full transition-colors"
-              aria-label="More options"
-            >
-              <MoreVertical className="w-4 h-4 text-timberwolf" />
-            </button>
+            {onAddToPlaylist && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToPlaylist(video);
+                }}
+                className="p-1.5 hover:bg-calypso rounded-full transition-colors"
+                aria-label="Add to playlist"
+              >
+                <ListPlus className="w-4 h-4 text-timberwolf" />
+              </button>
+            )}
           </div>
         </div>
       </div>

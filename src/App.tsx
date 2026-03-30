@@ -111,12 +111,13 @@ function App() {
     if (!existingDiv) {
       const playerDiv = document.createElement('div');
       playerDiv.id = 'youtube-player';
-      playerDiv.style.display = 'none';
       playerDiv.style.position = 'fixed';
-      playerDiv.style.top = '0';
-      playerDiv.style.left = '0';
-      playerDiv.style.width = '1px';
-      playerDiv.style.height = '1px';
+      playerDiv.style.top = '-10000px';
+      playerDiv.style.left = '-10000px';
+      playerDiv.style.width = '320px';
+      playerDiv.style.height = '180px';
+      playerDiv.style.opacity = '0';
+      playerDiv.style.pointerEvents = 'none';
       playerDiv.style.zIndex = '-1';
       document.body.appendChild(playerDiv);
       console.log('✅ Created player div and appended to body');

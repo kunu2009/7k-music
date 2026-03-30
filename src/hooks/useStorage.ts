@@ -74,10 +74,12 @@ export function usePlaylists() {
 
   const createPlaylist = useCallback(async (name: string) => {
     try {
-      await storage.createPlaylist(name);
+      const playlist = await storage.createPlaylist(name);
       await loadPlaylists();
+      return playlist;
     } catch (error) {
       console.error('Error creating playlist:', error);
+      return undefined;
     }
   }, [loadPlaylists]);
 

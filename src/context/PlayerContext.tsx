@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext } from 'react';
+import React, { useState, createContext, useContext, useRef, useEffect } from 'react';
 import { YouTubeVideo } from '@/types';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { storage } from '@/utils/storage';
@@ -43,6 +43,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
   const [shuffledQueue, setShuffledQueue] = useState<YouTubeVideo[]>([]);
+  const pendingVideoRef = useRef<YouTubeVideo | null>(null);
 
   const {
     isPlaying,
@@ -67,7 +68,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Auto-play next video
       next();
     },
+    onError: (errorCode) => {
+      if ((errorCode === 101 || errorCode === 150) && queue.length > 1) {
+        next();
+      }
+    },
   });
+
+  useEffect(() => {
+    if (!apiReady || !isReady || !pendingVideoRef.current) {
+      return;
+    }
+
+    const videoToPlay = pendingVideoRef.current;
+    pendingVideoRef.current = null;
+    loadVideo(videoToPlay, true);
+  }, [apiReady, isReady, loadVideo]);
 
   const initPlayer = (elementId: string) => {
     initializePlayer(elementId);
@@ -93,21 +109,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Wait for both API and Player to be ready
     if (!apiReady || !isReady) {
       console.warn('⚠️ Player not ready yet, waiting... API:', apiReady, 'Player:', isReady);
-      
-      // Wait for player to be ready
-      const checkReady = setInterval(() => {
-        if (apiReady && isReady) {
-          clearInterval(checkReady);
-          console.log('✅ Player now ready, loading video:', video.title);
-          loadVideo(video, true);
-        }
-      }, 100);
-      
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        clearInterval(checkReady);
-        console.error('❌ Timeout waiting for player to be ready');
-      }, 10000);
+      pendingVideoRef.current = video;
     } else {
       console.log('✅ Player ready, loading video immediately');
       loadVideo(video, true);

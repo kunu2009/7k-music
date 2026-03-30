@@ -5,7 +5,7 @@ import { LoadingSpinner, EmptyState } from '@/components/common';
 import { YouTubeVideo } from '@/types';
 import { youtubeApi } from '@/utils/youtube';
 import { usePlayer } from '@/context/PlayerContext';
-import { useFavorites } from '@/hooks/useStorage';
+import { useFavorites, usePlaylists } from '@/hooks/useStorage';
 import { Search as SearchIcon } from 'lucide-react';
 
 export const SearchPage: React.FC = () => {
@@ -15,6 +15,7 @@ export const SearchPage: React.FC = () => {
   
   const { playVideo } = usePlayer();
   const { addFavorite, removeFavorite, isFavorite } = useFavorites();
+  const { playlists, addToPlaylist, createPlaylist } = usePlaylists();
 
   const handleSearch = async (query: string) => {
     try {
@@ -40,6 +41,30 @@ export const SearchPage: React.FC = () => {
     } else {
       await addFavorite(video);
     }
+  };
+
+  const handleAddToPlaylist = async (video: YouTubeVideo) => {
+    if (playlists.length === 0) {
+      const playlistName = window.prompt('No playlists found. Enter a new playlist name:');
+      if (!playlistName?.trim()) return;
+      const created = await createPlaylist(playlistName.trim());
+      if (created) {
+        await addToPlaylist(created.id, video);
+      }
+      return;
+    }
+
+    const optionsText = playlists
+      .map((playlist, index) => `${index + 1}. ${playlist.name}`)
+      .join('\n');
+    const selected = window.prompt(`Add to playlist:\n${optionsText}\n\nEnter playlist number:`);
+    const selectedIndex = Number.parseInt(selected || '', 10) - 1;
+
+    if (Number.isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= playlists.length) {
+      return;
+    }
+
+    await addToPlaylist(playlists[selectedIndex].id, video);
   };
 
   return (
@@ -91,6 +116,7 @@ export const SearchPage: React.FC = () => {
                   onPlay={handlePlay}
                   onFavorite={handleFavorite}
                   isFavorite={isFavorite(video.id)}
+                  onAddToPlaylist={handleAddToPlaylist}
                 />
               ))}
             </div>

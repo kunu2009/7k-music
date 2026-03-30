@@ -1,5 +1,53 @@
+import { YouTubeVideo } from '@/types';
+
 const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
 const BASE_URL = 'https://www.googleapis.com/youtube/v3';
+const CACHE_PREFIX = 'yt-cache:';
+
+interface CachePayload<T> {
+  expiresAt: number;
+  data: T;
+}
+
+function getCached<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(`${CACHE_PREFIX}${key}`);
+    if (!raw) return null;
+
+    const payload = JSON.parse(raw) as CachePayload<T>;
+    if (Date.now() > payload.expiresAt) {
+      localStorage.removeItem(`${CACHE_PREFIX}${key}`);
+      return null;
+    }
+
+    return payload.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCached<T>(key: string, data: T, ttlMs: number) {
+  try {
+    const payload: CachePayload<T> = {
+      data,
+      expiresAt: Date.now() + ttlMs,
+    };
+
+    localStorage.setItem(`${CACHE_PREFIX}${key}`, JSON.stringify(payload));
+  } catch {
+    // Ignore cache write errors (quota/private mode)
+  }
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`YouTube API error: ${response.statusText}`);
+  }
+
+  return response.json() as Promise<T>;
+}
 
 if (!API_KEY) {
   console.error('⚠️ YouTube API Key not found. Please add VITE_YOUTUBE_API_KEY to your .env file.');
@@ -12,16 +60,18 @@ export const youtubeApi = {
    */
   async getTrendingMusicVideos(maxResults = 20, regionCode = 'US') {
     try {
-      const response = await fetch(
+      const cacheKey = `trending:${regionCode}:${maxResults}`;
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        return this.transformVideos(cached);
+      }
+
+      const data = await fetchJson<{ items: any[] }>(
         `${BASE_URL}/videos?part=snippet,contentDetails,statistics&chart=mostPopular&videoCategoryId=10&maxResults=${maxResults}&regionCode=${regionCode}&key=${API_KEY}`
       );
 
-      if (!response.ok) {
-        throw new Error(`YouTube API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return this.transformVideos(data.items);
+      setCached(cacheKey, data.items || [], 1000 * 60 * 15);
+      return this.transformVideos(data.items || []);
     } catch (error) {
       console.error('Error fetching trending music videos:', error);
       throw error;
@@ -34,23 +84,25 @@ export const youtubeApi = {
    */
   async searchMusicVideos(query: string, maxResults = 20, pageToken?: string) {
     try {
+      const cacheKey = `search:${query.toLowerCase().trim()}:${maxResults}:${pageToken || ''}`;
+      const cached = getCached<YouTubeVideo[]>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       let url = `${BASE_URL}/search?part=snippet&type=video&videoCategoryId=10&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${API_KEY}`;
       
       if (pageToken) {
         url += `&pageToken=${pageToken}`;
       }
 
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`YouTube API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await fetchJson<{ items: any[] }>(url);
       
       // Get detailed information for each video
-      const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
-      return await this.getVideoDetails(videoIds);
+      const videoIds = (data.items || []).map((item: any) => item.id.videoId).filter(Boolean).join(',');
+      const results = await this.getVideoDetails(videoIds);
+      setCached(cacheKey, results, 1000 * 60 * 10);
+      return results;
     } catch (error) {
       console.error('Error searching music videos:', error);
       throw error;
@@ -62,16 +114,29 @@ export const youtubeApi = {
    */
   async getVideoDetails(videoIds: string) {
     try {
-      const response = await fetch(
-        `${BASE_URL}/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${API_KEY}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`YouTube API error: ${response.statusText}`);
+      if (!videoIds) {
+        return [];
       }
 
-      const data = await response.json();
-      return this.transformVideos(data.items);
+      const normalizedIds = videoIds
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean)
+        .sort()
+        .join(',');
+
+      const cacheKey = `details:${normalizedIds}`;
+      const cached = getCached<any[]>(cacheKey);
+      if (cached) {
+        return this.transformVideos(cached);
+      }
+
+      const data = await fetchJson<{ items: any[] }>(
+        `${BASE_URL}/videos?part=snippet,contentDetails,statistics&id=${normalizedIds}&key=${API_KEY}`
+      );
+
+      setCached(cacheKey, data.items || [], 1000 * 60 * 60);
+      return this.transformVideos(data.items || []);
     } catch (error) {
       console.error('Error fetching video details:', error);
       throw error;
@@ -83,17 +148,19 @@ export const youtubeApi = {
    */
   async getRelatedVideos(videoId: string, maxResults = 10) {
     try {
-      const response = await fetch(
-        `${BASE_URL}/search?part=snippet&type=video&videoCategoryId=10&relatedToVideoId=${videoId}&maxResults=${maxResults}&key=${API_KEY}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`YouTube API error: ${response.statusText}`);
+      const cacheKey = `related:${videoId}:${maxResults}`;
+      const cached = getCached<YouTubeVideo[]>(cacheKey);
+      if (cached) {
+        return cached;
       }
 
-      const data = await response.json();
-      const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
-      return await this.getVideoDetails(videoIds);
+      const data = await fetchJson<{ items: any[] }>(
+        `${BASE_URL}/search?part=snippet&type=video&videoCategoryId=10&relatedToVideoId=${videoId}&maxResults=${maxResults}&key=${API_KEY}`
+      );
+      const videoIds = (data.items || []).map((item: any) => item.id.videoId).filter(Boolean).join(',');
+      const results = await this.getVideoDetails(videoIds);
+      setCached(cacheKey, results, 1000 * 60 * 30);
+      return results;
     } catch (error) {
       console.error('Error fetching related videos:', error);
       throw error;
