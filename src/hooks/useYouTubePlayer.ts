@@ -114,6 +114,10 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
               stopProgressTracking();
             } else if (state === 3) {
               setStatus('buffering');
+            } else if (state === 5) {
+              setIsPlaying(false);
+              setStatus('paused');
+              stopProgressTracking();
             } else if (state === 0) {
               setIsPlaying(false);
               setStatus('paused');

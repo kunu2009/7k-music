@@ -9,25 +9,46 @@ import { useFavorites, usePlaylists } from '@/hooks/useStorage';
 import { PlaylistPickerModal } from '@/components/PlaylistPickerModal';
 import { Search as SearchIcon } from 'lucide-react';
 
+const SEARCH_CACHE_PREFIX = 'search-cache-v1:';
+
 export const SearchPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<YouTubeVideo[]>([]);
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = useState<YouTubeVideo | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const { playVideo } = usePlayer();
   const { addFavorite, removeFavorite, isFavorite } = useFavorites();
   const { playlists, addToPlaylist, createPlaylist } = usePlaylists();
 
   const handleSearch = async (query: string) => {
+    const normalizedQuery = query.trim().toLowerCase();
     try {
       setLoading(true);
       setHasSearched(true);
+      setError(null);
       const results = await youtubeApi.searchMusicVideos(query, 20);
       setSearchResults(results);
+      localStorage.setItem(`${SEARCH_CACHE_PREFIX}${normalizedQuery}`, JSON.stringify({ results, cachedAt: Date.now() }));
     } catch (err) {
       console.error('Error searching videos:', err);
+      try {
+        const cached = localStorage.getItem(`${SEARCH_CACHE_PREFIX}${normalizedQuery}`);
+        if (cached) {
+          const parsed = JSON.parse(cached) as { results: YouTubeVideo[] };
+          if (Array.isArray(parsed.results) && parsed.results.length > 0) {
+            setSearchResults(parsed.results);
+            setError('Showing cached results. Connect to refresh.');
+            return;
+          }
+        }
+      } catch (cacheError) {
+        console.error('Error reading search cache:', cacheError);
+      }
+
       setSearchResults([]);
+      setError('Search failed. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -90,11 +111,29 @@ export const SearchPage: React.FC = () => {
             title="Start Searching"
             description="Enter a song name, artist, or genre to find music videos."
           />
+        ) : error && searchResults.length > 0 ? (
+          <>
+            <div className="mb-6">
+              <p className="text-timberwolf opacity-75">{error}</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {searchResults.map((video) => (
+                <VideoCard
+                  key={video.id}
+                  video={video}
+                  onPlay={handlePlay}
+                  onFavorite={handleFavorite}
+                  isFavorite={isFavorite(video.id)}
+                  onAddToPlaylist={handleAddToPlaylist}
+                />
+              ))}
+            </div>
+          </>
         ) : searchResults.length === 0 ? (
           <EmptyState
             icon={<SearchIcon className="w-16 h-16" />}
             title="No Results Found"
-            description="Try searching with different keywords or check your spelling."
+            description={error || 'Try searching with different keywords or check your spelling.'}
           />
         ) : (
           <>

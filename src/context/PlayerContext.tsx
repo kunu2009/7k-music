@@ -3,6 +3,18 @@ import { PlayerStatus, YouTubeVideo } from '@/types';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { storage } from '@/utils/storage';
 
+const PLAYER_PERSISTENCE_KEY = 'player-state-v1';
+
+interface PersistedPlayerState {
+  currentVideo: YouTubeVideo | null;
+  queue: YouTubeVideo[];
+  currentIndex: number;
+  currentTime: number;
+  repeat: 'off' | 'one' | 'all';
+  shuffle: boolean;
+  isMuted: boolean;
+}
+
 interface PlayerContextType {
   currentVideo: YouTubeVideo | null;
   queue: YouTubeVideo[];
@@ -48,6 +60,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
   const [shuffledQueue, setShuffledQueue] = useState<YouTubeVideo[]>([]);
   const pendingVideoRef = useRef<YouTubeVideo | null>(null);
+  const pendingSeekTimeRef = useRef<number>(0);
+  const hasRestoredStateRef = useRef(false);
 
   const {
     isPlaying,
@@ -90,6 +104,74 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     pendingVideoRef.current = null;
     loadVideo(videoToPlay, true);
   }, [apiReady, isReady, loadVideo]);
+
+  useEffect(() => {
+    if (hasRestoredStateRef.current) {
+      return;
+    }
+
+    try {
+      const raw = localStorage.getItem(PLAYER_PERSISTENCE_KEY);
+      if (!raw) {
+        hasRestoredStateRef.current = true;
+        return;
+      }
+
+      const persisted = JSON.parse(raw) as PersistedPlayerState;
+      setQueue(Array.isArray(persisted.queue) ? persisted.queue : []);
+      setCurrentIndex(typeof persisted.currentIndex === 'number' ? persisted.currentIndex : 0);
+      setCurrentVideo(persisted.currentVideo || null);
+      setRepeat(persisted.repeat || 'off');
+      setShuffle(!!persisted.shuffle);
+      setIsMuted(!!persisted.isMuted);
+      pendingSeekTimeRef.current = typeof persisted.currentTime === 'number' ? persisted.currentTime : 0;
+    } catch (error) {
+      console.error('Failed to restore player state:', error);
+    } finally {
+      hasRestoredStateRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!apiReady || !isReady || !currentVideo) {
+      return;
+    }
+
+    const seekTime = pendingSeekTimeRef.current;
+    if (seekTime <= 0) {
+      return;
+    }
+
+    loadVideo(currentVideo, false);
+    const timer = window.setTimeout(() => {
+      playerSeekTo(seekTime);
+      pendingSeekTimeRef.current = 0;
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [apiReady, isReady, currentVideo, loadVideo, playerSeekTo]);
+
+  useEffect(() => {
+    if (!hasRestoredStateRef.current) {
+      return;
+    }
+
+    const persisted: PersistedPlayerState = {
+      currentVideo,
+      queue,
+      currentIndex,
+      currentTime,
+      repeat,
+      shuffle,
+      isMuted,
+    };
+
+    try {
+      localStorage.setItem(PLAYER_PERSISTENCE_KEY, JSON.stringify(persisted));
+    } catch (error) {
+      console.error('Failed to persist player state:', error);
+    }
+  }, [currentVideo, queue, currentIndex, currentTime, repeat, shuffle, isMuted]);
 
   const initPlayer = (elementId: string) => {
     initializePlayer(elementId);

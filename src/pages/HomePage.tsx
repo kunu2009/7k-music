@@ -8,6 +8,8 @@ import { useFavorites, usePlaylists } from '@/hooks/useStorage';
 import { PlaylistPickerModal } from '@/components/PlaylistPickerModal';
 import { TrendingUp, Music2 } from 'lucide-react';
 
+const HOME_CACHE_KEY = 'home-trending-cache-v1';
+
 export const HomePage: React.FC = () => {
   const [trendingVideos, setTrendingVideos] = useState<YouTubeVideo[]>([]);
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = useState<YouTubeVideo | null>(null);
@@ -19,6 +21,19 @@ export const HomePage: React.FC = () => {
   const { playlists, addToPlaylist, createPlaylist } = usePlaylists();
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem(HOME_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { videos: YouTubeVideo[] };
+        if (Array.isArray(parsed.videos) && parsed.videos.length > 0) {
+          setTrendingVideos(parsed.videos);
+          setLoading(false);
+        }
+      }
+    } catch (cacheError) {
+      console.error('Failed to read home cache:', cacheError);
+    }
+
     loadTrendingVideos();
   }, []);
 
@@ -28,9 +43,12 @@ export const HomePage: React.FC = () => {
       setError(null);
       const videos = await youtubeApi.getTrendingMusicVideos(24);
       setTrendingVideos(videos);
+      localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({ videos, cachedAt: Date.now() }));
     } catch (err) {
       console.error('Error loading trending videos:', err);
-      setError('Failed to load trending music videos. Please check your API key and try again.');
+      if (trendingVideos.length === 0) {
+        setError('Failed to load trending music videos. Please check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
