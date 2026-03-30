@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites } from '@/hooks/useStorage';
+import { triggerHaptic } from '@/utils/feedback';
 
 export function NowPlayingPage() {
   const navigate = useNavigate();
@@ -36,6 +38,8 @@ export function NowPlayingPage() {
   } = usePlayer();
 
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [previewTime, setPreviewTime] = useState<number | null>(null);
 
   if (!currentVideo) {
     navigate('/');
@@ -52,10 +56,31 @@ export function NowPlayingPage() {
     }
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+  const calculateSeekTime = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    seekTo(percent * duration);
+    const pointerX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const percent = rect.width > 0 ? pointerX / rect.width : 0;
+    return percent * duration;
+  };
+
+  const handleSeekStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
+    const newTime = calculateSeekTime(e);
+    setIsSeeking(true);
+    setPreviewTime(newTime);
+    seekTo(newTime);
+  };
+
+  const handleSeekMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isSeeking || duration <= 0) return;
+    const newTime = calculateSeekTime(e);
+    setPreviewTime(newTime);
+    seekTo(newTime);
+  };
+
+  const handleSeekEnd = () => {
+    setIsSeeking(false);
+    setPreviewTime(null);
   };
 
   const formatTime = (seconds: number) => {
@@ -64,16 +89,22 @@ export function NowPlayingPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const activeTime = previewTime ?? currentTime;
+  const progress = duration > 0 ? (activeTime / duration) * 100 : 0;
   const isLoadingState = playerStatus === 'loading' || playerStatus === 'buffering';
+
+  const withHaptic = (action: () => void, intensity: 'light' | 'medium' = 'light') => () => {
+    triggerHaptic(intensity);
+    action();
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-gradient-to-b from-gray-900 via-black to-black text-white flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
         <button
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-white/10 rounded-full transition"
+          onClick={withHaptic(() => navigate(-1))}
+          className="p-2 hover:bg-white/10 active:scale-95 rounded-full transition-all"
         >
           <ChevronDown className="w-6 h-6" />
         </button>
@@ -114,7 +145,11 @@ export function NowPlayingPage() {
       {/* Progress Bar */}
       <div className="px-8 py-2">
         <div
-          onClick={handleSeek}
+          onPointerDown={handleSeekStart}
+          onPointerMove={handleSeekMove}
+          onPointerUp={handleSeekEnd}
+          onPointerCancel={handleSeekEnd}
+          onPointerLeave={handleSeekEnd}
           className="relative h-1 bg-gray-800 rounded-full cursor-pointer group"
         >
           <div
@@ -127,8 +162,8 @@ export function NowPlayingPage() {
           />
         </div>
         <div className="flex justify-between text-xs text-gray-400 mt-2">
-          <span>{formatTime(currentTime)}</span>
-          <span>-{formatTime(duration - currentTime)}</span>
+          <span>{formatTime(activeTime)}</span>
+          <span>-{formatTime(Math.max(duration - activeTime, 0))}</span>
         </div>
       </div>
 
@@ -137,7 +172,7 @@ export function NowPlayingPage() {
         {/* Secondary Controls */}
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={toggleShuffle}
+            onClick={withHaptic(toggleShuffle)}
             className={`p-2 rounded-full transition ${
               shuffle ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
             }`}
@@ -146,7 +181,7 @@ export function NowPlayingPage() {
           </button>
 
           <button
-            onClick={handleToggleFavorite}
+            onClick={withHaptic(handleToggleFavorite)}
             className={`p-2 rounded-full transition ${
               favorite ? 'text-red-500' : 'text-gray-400 hover:text-white'
             }`}
@@ -155,7 +190,7 @@ export function NowPlayingPage() {
           </button>
 
           <button
-            onClick={toggleRepeat}
+            onClick={withHaptic(toggleRepeat)}
             className={`p-2 rounded-full transition relative ${
               repeat !== 'off' ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
             }`}
@@ -170,15 +205,15 @@ export function NowPlayingPage() {
         {/* Main Controls */}
         <div className="flex items-center justify-center gap-4">
           <button
-            onClick={previous}
-            className="p-3 hover:bg-white/10 rounded-full transition"
+            onClick={withHaptic(previous)}
+            className="p-3 hover:bg-white/10 active:scale-95 rounded-full transition-all"
           >
             <SkipBack className="w-7 h-7" />
           </button>
 
           <button
-            onClick={playPause}
-            className="w-16 h-16 bg-[#a4d96c] hover:bg-[#b5e07d] rounded-full flex items-center justify-center transition shadow-lg hover:scale-105"
+            onClick={withHaptic(playPause, 'medium')}
+            className="w-16 h-16 bg-[#a4d96c] hover:bg-[#b5e07d] active:scale-95 rounded-full flex items-center justify-center transition shadow-lg hover:scale-105"
           >
             {isPlaying ? (
               <Pause className="w-8 h-8 text-black fill-black" />
@@ -188,8 +223,8 @@ export function NowPlayingPage() {
           </button>
 
           <button
-            onClick={next}
-            className="p-3 hover:bg-white/10 rounded-full transition"
+            onClick={withHaptic(next)}
+            className="p-3 hover:bg-white/10 active:scale-95 rounded-full transition-all"
           >
             <SkipForward className="w-7 h-7" />
           </button>
@@ -202,8 +237,8 @@ export function NowPlayingPage() {
           </button>
 
           <button
-            onClick={() => navigate('/playlists')}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-full transition"
+            onClick={withHaptic(() => navigate('/playlists'))}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 active:scale-95 rounded-full transition-all"
           >
             <ListMusic className="w-5 h-5" />
             <span className="text-sm">{queue.length} in queue</span>

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PlayerStatus, YouTubeVideo } from '@/types';
+import { triggerHaptic } from '@/utils/feedback';
 import { Play, Pause, SkipBack, SkipForward, Heart, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 
 interface MiniPlayerProps {
@@ -39,10 +40,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   onExpand,
 }) => {
   const navigate = useNavigate();
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [previewTime, setPreviewTime] = useState<number | null>(null);
   
   if (!video) return null;
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const activeTime = previewTime ?? currentTime;
+  const progress = duration > 0 ? (activeTime / duration) * 100 : 0;
   const isLoadingState = playerStatus === 'loading' || playerStatus === 'buffering';
 
   const formatTime = (seconds: number) => {
@@ -51,12 +55,36 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const calculateSeekTime = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const percentage = clickX / rect.width;
-    const newTime = percentage * duration;
+    const clickX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const percentage = rect.width > 0 ? clickX / rect.width : 0;
+    return percentage * duration;
+  };
+
+  const handleSeekStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
+    const newTime = calculateSeekTime(e);
+    setIsSeeking(true);
+    setPreviewTime(newTime);
     onSeek(newTime);
+  };
+
+  const handleSeekMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isSeeking || duration <= 0) return;
+    const newTime = calculateSeekTime(e);
+    setPreviewTime(newTime);
+    onSeek(newTime);
+  };
+
+  const handleSeekEnd = () => {
+    setIsSeeking(false);
+    setPreviewTime(null);
+  };
+
+  const withHaptic = (action: () => void, intensity: 'light' | 'medium' = 'light') => () => {
+    triggerHaptic(intensity);
+    action();
   };
 
   return (
@@ -64,7 +92,11 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
       {/* Progress bar */}
       <div 
         className="h-1 bg-chathams-blue cursor-pointer group relative"
-        onClick={handleProgressClick}
+        onPointerDown={handleSeekStart}
+        onPointerMove={handleSeekMove}
+        onPointerUp={handleSeekEnd}
+        onPointerCancel={handleSeekEnd}
+        onPointerLeave={handleSeekEnd}
       >
         <div 
           className="h-full bg-calypso transition-all duration-100"
@@ -119,16 +151,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           {/* Center: Playback Controls */}
           <div className="flex items-center gap-2">
             <button
-              onClick={onPrevious}
-              className="p-2 hover:bg-chathams-blue rounded-full transition-colors"
+              onClick={withHaptic(onPrevious)}
+              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all"
               aria-label="Previous"
             >
               <SkipBack className="w-5 h-5 text-timberwolf" />
             </button>
 
             <button
-              onClick={onPlayPause}
-              className="p-3 bg-calypso hover:bg-chathams-blue rounded-full transition-all transform hover:scale-105"
+              onClick={withHaptic(onPlayPause, 'medium')}
+              className="p-3 bg-calypso hover:bg-chathams-blue active:scale-95 rounded-full transition-all transform hover:scale-105"
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -139,8 +171,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             </button>
 
             <button
-              onClick={onNext}
-              className="p-2 hover:bg-chathams-blue rounded-full transition-colors"
+              onClick={withHaptic(onNext)}
+              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all"
               aria-label="Next"
             >
               <SkipForward className="w-5 h-5 text-timberwolf" />
@@ -154,8 +186,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             </span>
 
             <button
-              onClick={onToggleFavorite}
-              className="p-2 hover:bg-chathams-blue rounded-full transition-colors"
+              onClick={withHaptic(onToggleFavorite)}
+              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all"
               aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
               <Heart 
@@ -164,8 +196,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             </button>
 
             <button
-              onClick={onToggleMute}
-              className="p-2 hover:bg-chathams-blue rounded-full transition-colors hidden md:block"
+              onClick={withHaptic(onToggleMute)}
+              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all hidden md:block"
               aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted ? (
@@ -177,8 +209,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
             {onExpand && (
               <button
-                onClick={() => navigate('/now-playing')}
-                className="p-2 hover:bg-chathams-blue rounded-full transition-colors hidden md:block"
+                onClick={withHaptic(() => navigate('/now-playing'))}
+                className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all hidden md:block"
                 aria-label="Expand player"
               >
                 <Maximize2 className="w-5 h-5 text-timberwolf" />
