@@ -23,6 +23,7 @@ interface PlayerContextType {
   isReady: boolean;
   playerStatus: PlayerStatus;
   playerErrorCode: number | null;
+  playerNotice: string | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -59,6 +60,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<'off' | 'one' | 'all'>('off');
   const [shuffledQueue, setShuffledQueue] = useState<YouTubeVideo[]>([]);
+  const [playerNotice, setPlayerNotice] = useState<string | null>(null);
   const pendingVideoRef = useRef<YouTubeVideo | null>(null);
   const pendingSeekTimeRef = useRef<number>(0);
   const hasRestoredStateRef = useRef(false);
@@ -88,12 +90,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Auto-play next video
       next();
     },
-    onError: (_errorCode) => {
+    onError: (receivedErrorCode) => {
       if (queue.length > 1) {
+        setPlayerNotice(`Track unavailable (${receivedErrorCode}). Skipping to next.`);
         next();
+        return;
       }
+
+      setPlayerNotice(`Track unavailable (${receivedErrorCode}).`);
     },
   });
+
+  useEffect(() => {
+    if (!playerNotice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setPlayerNotice(null);
+    }, 3500);
+
+    return () => window.clearTimeout(timeout);
+  }, [playerNotice]);
+
+  useEffect(() => {
+    if (status === 'playing' && playerNotice) {
+      setPlayerNotice(null);
+    }
+  }, [status, playerNotice]);
 
   useEffect(() => {
     if (!apiReady || !isReady || !pendingVideoRef.current) {
@@ -312,6 +336,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     isReady,
     playerStatus: status,
     playerErrorCode: errorCode,
+    playerNotice,
     isPlaying,
     currentTime,
     duration,

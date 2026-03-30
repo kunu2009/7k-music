@@ -4,6 +4,7 @@ import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
 import { Navigation } from '@/components/Navigation';
 import { NetworkBanner } from '@/components/NetworkBanner';
 import { MiniPlayer } from '@/components/MiniPlayer';
+import { PlayerToast } from '@/components/PlayerToast';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { HomePage } from '@/pages/HomePage';
 import { SearchPage } from '@/pages/SearchPage';
@@ -21,6 +22,7 @@ function PlayerWrapper() {
     apiReady,
     playerStatus,
     playerErrorCode,
+    playerNotice,
     isPlaying,
     currentTime,
     duration,
@@ -104,6 +106,66 @@ function PlayerWrapper() {
     }
   };
 
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) {
+      return;
+    }
+
+    const mediaSession = navigator.mediaSession;
+
+    if (!currentVideo) {
+      mediaSession.metadata = null;
+      return;
+    }
+
+    mediaSession.metadata = new MediaMetadata({
+      title: currentVideo.title,
+      artist: currentVideo.channelTitle,
+      album: '7K Music',
+      artwork: [
+        { src: currentVideo.thumbnails.default, sizes: '120x90', type: 'image/jpeg' },
+        { src: currentVideo.thumbnails.medium, sizes: '320x180', type: 'image/jpeg' },
+        { src: currentVideo.thumbnails.high, sizes: '480x360', type: 'image/jpeg' },
+      ],
+    });
+
+    mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+    if ('setPositionState' in mediaSession && duration > 0) {
+      try {
+        mediaSession.setPositionState({
+          duration,
+          playbackRate: 1,
+          position: Math.min(currentTime, duration),
+        });
+      } catch {
+        // Ignore unsupported position state updates
+      }
+    }
+
+    try {
+      mediaSession.setActionHandler('play', () => {
+        if (!isPlaying) {
+          playPause();
+        }
+      });
+      mediaSession.setActionHandler('pause', () => {
+        if (isPlaying) {
+          playPause();
+        }
+      });
+      mediaSession.setActionHandler('previoustrack', previous);
+      mediaSession.setActionHandler('nexttrack', next);
+      mediaSession.setActionHandler('seekto', (details) => {
+        if (typeof details.seekTime === 'number') {
+          seekTo(details.seekTime);
+        }
+      });
+    } catch {
+      // Ignore unsupported media session handlers
+    }
+  }, [currentVideo, isPlaying, currentTime, duration, playPause, previous, next, seekTo]);
+
   return (
     <>
       {/* Routes */}
@@ -119,6 +181,7 @@ function PlayerWrapper() {
 
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
+      <PlayerToast message={playerNotice} />
 
       {/* Mini Player - Hide on Now Playing page */}
       {currentVideo && !isNowPlayingPage && (
