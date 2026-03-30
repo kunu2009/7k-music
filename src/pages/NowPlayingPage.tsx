@@ -82,34 +82,9 @@ export function NowPlayingPage() {
         </button>
       </div>
 
-      {/* Album Art */}
-      <div className="flex-1 flex items-center justify-center px-8 py-8">
-        <div className="relative w-full max-w-sm aspect-square">
-          {/* Glow Effect */}
-          <div
-            className="absolute inset-0 rounded-full blur-3xl opacity-30"
-            style={{
-              background: `radial-gradient(circle, #17557b, #366e8d, transparent)`,
-            }}
-          />
-          
-          {/* Album Cover */}
-          <div className="relative w-full h-full rounded-full overflow-hidden shadow-2xl ring-1 ring-white/10">
-            <img
-              src={currentVideo.thumbnails.maxres || currentVideo.thumbnails.high}
-              alt={currentVideo.title}
-              className="w-full h-full object-cover"
-            />
-            
-            {/* Vinyl Effect Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-black/20 to-black/40" />
-            
-            {/* Center Dot (Vinyl) */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-800 to-black ring-4 ring-white/10" />
-            </div>
-          </div>
-        </div>
+      {/* Video Area */}
+      <div className="px-4 sm:px-8 pt-4 pb-4">
+        <div className="mx-auto w-full max-w-[720px] aspect-video rounded-2xl border border-white/10 bg-black/50" />
       </div>
 
       {/* Song Info */}

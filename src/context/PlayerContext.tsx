@@ -7,6 +7,8 @@ interface PlayerContextType {
   currentVideo: YouTubeVideo | null;
   queue: YouTubeVideo[];
   currentIndex: number;
+  apiReady: boolean;
+  isReady: boolean;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -205,6 +207,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     currentVideo,
     queue,
     currentIndex,
+    apiReady,
+    isReady,
     isPlaying,
     currentTime,
     duration,

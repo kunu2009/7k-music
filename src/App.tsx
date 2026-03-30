@@ -17,6 +17,7 @@ function PlayerWrapper() {
   const location = useLocation();
   const {
     currentVideo,
+    apiReady,
     isPlaying,
     currentTime,
     duration,
@@ -42,6 +43,11 @@ function PlayerWrapper() {
       return;
     }
 
+    if (!apiReady) {
+      console.log('⏳ Waiting for YouTube API before initializing player...');
+      return;
+    }
+
     const timer = setTimeout(() => {
       console.log('🎬 Attempting to initialize player...');
       const playerContainer = document.getElementById('youtube-player');
@@ -55,7 +61,35 @@ function PlayerWrapper() {
     }, 500);
     
     return () => clearTimeout(timer);
-  }, []); // Empty dependency array - only run once!
+  }, [apiReady, initPlayer]);
+
+  useEffect(() => {
+    const playerContainer = document.getElementById('youtube-player');
+    if (!playerContainer) return;
+
+    if (isNowPlayingPage && currentVideo) {
+      playerContainer.style.position = 'fixed';
+      playerContainer.style.top = '72px';
+      playerContainer.style.left = '50%';
+      playerContainer.style.transform = 'translateX(-50%)';
+      playerContainer.style.width = 'min(92vw, 720px)';
+      playerContainer.style.height = 'min(52vw, 405px)';
+      playerContainer.style.opacity = '1';
+      playerContainer.style.pointerEvents = 'auto';
+      playerContainer.style.zIndex = '60';
+      return;
+    }
+
+    playerContainer.style.position = 'fixed';
+    playerContainer.style.top = '-10000px';
+    playerContainer.style.left = '-10000px';
+    playerContainer.style.transform = 'none';
+    playerContainer.style.width = '320px';
+    playerContainer.style.height = '180px';
+    playerContainer.style.opacity = '0';
+    playerContainer.style.pointerEvents = 'none';
+    playerContainer.style.zIndex = '-1';
+  }, [isNowPlayingPage, currentVideo]);
 
   const handleToggleFavorite = async () => {
     if (currentVideo) {
@@ -114,6 +148,7 @@ function App() {
       playerDiv.style.position = 'fixed';
       playerDiv.style.top = '-10000px';
       playerDiv.style.left = '-10000px';
+      playerDiv.style.transform = 'none';
       playerDiv.style.width = '320px';
       playerDiv.style.height = '180px';
       playerDiv.style.opacity = '0';
