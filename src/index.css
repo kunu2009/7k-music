@@ -29,6 +29,18 @@ body {
   min-height: 100vh;
 }
 
+.safe-pad-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-pad-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-space-bottom {
+  height: env(safe-area-inset-bottom);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 10px;

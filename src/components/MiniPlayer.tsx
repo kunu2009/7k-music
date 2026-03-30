@@ -43,6 +43,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   if (!video) return null;
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const isLoadingState = playerStatus === 'loading' || playerStatus === 'buffering';
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -59,7 +60,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gable-green border-t border-chathams-blue shadow-2xl z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-gable-green border-t border-chathams-blue shadow-2xl z-50 safe-pad-bottom">
       {/* Progress bar */}
       <div 
         className="h-1 bg-chathams-blue cursor-pointer group relative"
@@ -97,12 +98,21 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               className="w-14 h-14 rounded object-cover"
             />
             <div className="min-w-0">
-              <h4 className="text-white text-sm font-semibold truncate">
-                {video.title}
-              </h4>
-              <p className="text-timberwolf text-xs opacity-75 truncate">
-                {video.channelTitle}
-              </p>
+              {isLoadingState ? (
+                <>
+                  <div className="h-3.5 w-40 max-w-[70vw] bg-chathams-blue rounded animate-pulse mb-2" />
+                  <div className="h-3 w-28 max-w-[50vw] bg-chathams-blue rounded animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <h4 className="text-white text-sm font-semibold truncate">
+                    {video.title}
+                  </h4>
+                  <p className="text-timberwolf text-xs opacity-75 truncate">
+                    {video.channelTitle}
+                  </p>
+                </>
+              )}
             </div>
           </div>
 

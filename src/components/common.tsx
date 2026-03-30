@@ -63,3 +63,24 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     </div>
   );
 };
+
+interface VideoGridSkeletonProps {
+  count?: number;
+}
+
+export const VideoGridSkeleton: React.FC<VideoGridSkeletonProps> = ({ count = 8 }) => {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="bg-gable-green rounded-lg overflow-hidden animate-pulse">
+          <div className="aspect-video bg-chathams-blue" />
+          <div className="p-4 space-y-3">
+            <div className="h-4 bg-chathams-blue rounded w-full" />
+            <div className="h-4 bg-chathams-blue rounded w-3/4" />
+            <div className="h-3 bg-chathams-blue rounded w-2/3" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};

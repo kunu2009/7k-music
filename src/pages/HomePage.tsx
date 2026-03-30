@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { VideoCard } from '@/components/VideoCard';
-import { LoadingSpinner, EmptyState } from '@/components/common';
+import { EmptyState, VideoGridSkeleton } from '@/components/common';
 import { YouTubeVideo } from '@/types';
 import { youtubeApi } from '@/utils/youtube';
 import { usePlayer } from '@/context/PlayerContext';
@@ -36,6 +36,19 @@ export const HomePage: React.FC = () => {
 
     loadTrendingVideos();
   }, []);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+
+    const onReconnect = () => {
+      loadTrendingVideos();
+    };
+
+    window.addEventListener('online', onReconnect);
+    return () => window.removeEventListener('online', onReconnect);
+  }, [error]);
 
   const loadTrendingVideos = async () => {
     try {
@@ -99,7 +112,7 @@ export const HomePage: React.FC = () => {
 
         {/* Content */}
         {loading ? (
-          <LoadingSpinner size="lg" text="Loading trending music videos..." />
+          <VideoGridSkeleton count={12} />
         ) : error ? (
           <EmptyState
             icon={<Music2 className="w-16 h-16" />}

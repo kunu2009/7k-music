@@ -65,6 +65,7 @@ export function NowPlayingPage() {
   };
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const isLoadingState = playerStatus === 'loading' || playerStatus === 'buffering';
 
   return (
     <div className="fixed inset-0 z-50 bg-gradient-to-b from-gray-900 via-black to-black text-white flex flex-col">
@@ -86,7 +87,13 @@ export function NowPlayingPage() {
 
       {/* Video Area */}
       <div className="px-4 sm:px-8 pt-4 pb-4">
-        <div className="mx-auto w-full max-w-[720px] aspect-video rounded-2xl border border-white/10 bg-black/50" />
+        <div className="mx-auto w-full max-w-[720px] aspect-video rounded-2xl border border-white/10 bg-black/50 relative overflow-hidden">
+          {isLoadingState && (
+            <div className="absolute inset-0 p-4 animate-pulse">
+              <div className="w-full h-full rounded-xl bg-white/5" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Song Info */}
@@ -205,7 +212,7 @@ export function NowPlayingPage() {
       </div>
 
       {/* Safe Area Bottom Padding */}
-      <div className="h-8" />
+      <div className="h-8 safe-space-bottom" />
     </div>
   );
 }

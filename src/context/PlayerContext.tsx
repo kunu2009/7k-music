@@ -173,6 +173,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentVideo, queue, currentIndex, currentTime, repeat, shuffle, isMuted]);
 
+  useEffect(() => {
+    const handleReconnect = () => {
+      if (!currentVideo || !apiReady || !isReady) {
+        return;
+      }
+
+      if (status === 'error' || status === 'buffering' || status === 'paused') {
+        loadVideo(currentVideo, true);
+      }
+    };
+
+    window.addEventListener('online', handleReconnect);
+    return () => window.removeEventListener('online', handleReconnect);
+  }, [currentVideo, apiReady, isReady, status, loadVideo]);
+
   const initPlayer = (elementId: string) => {
     initializePlayer(elementId);
   };

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
 import { Navigation } from '@/components/Navigation';
+import { NetworkBanner } from '@/components/NetworkBanner';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { HomePage } from '@/pages/HomePage';
@@ -178,6 +179,7 @@ function App() {
       <PlayerProvider>
         <div className="min-h-screen bg-black">
           <Navigation />
+          <NetworkBanner />
           <PlayerWrapper />
         </div>
       </PlayerProvider>

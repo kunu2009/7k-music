@@ -12,7 +12,7 @@ export const Navigation: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-gable-green border-b border-chathams-blue shadow-lg z-40">
+    <nav className="fixed top-0 left-0 right-0 bg-gable-green border-b border-chathams-blue shadow-lg z-40 safe-pad-top">
       <div className="container mx-auto px-2 sm:px-4">
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
           {/* Logo */}

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SearchBar } from '@/components/SearchBar';
 import { VideoCard } from '@/components/VideoCard';
-import { LoadingSpinner, EmptyState } from '@/components/common';
+import { EmptyState, VideoGridSkeleton } from '@/components/common';
 import { YouTubeVideo } from '@/types';
 import { youtubeApi } from '@/utils/youtube';
 import { usePlayer } from '@/context/PlayerContext';
@@ -14,6 +14,7 @@ const SEARCH_CACHE_PREFIX = 'search-cache-v1:';
 export const SearchPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<YouTubeVideo[]>([]);
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = useState<YouTubeVideo | null>(null);
+  const [lastQuery, setLastQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +25,7 @@ export const SearchPage: React.FC = () => {
 
   const handleSearch = async (query: string) => {
     const normalizedQuery = query.trim().toLowerCase();
+    setLastQuery(query);
     try {
       setLoading(true);
       setHasSearched(true);
@@ -53,6 +55,19 @@ export const SearchPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!error || !lastQuery.trim()) {
+      return;
+    }
+
+    const onReconnect = () => {
+      handleSearch(lastQuery);
+    };
+
+    window.addEventListener('online', onReconnect);
+    return () => window.removeEventListener('online', onReconnect);
+  }, [error, lastQuery]);
 
   const handlePlay = (video: YouTubeVideo) => {
     playVideo(video, searchResults);
@@ -104,7 +119,7 @@ export const SearchPage: React.FC = () => {
 
         {/* Content */}
         {loading ? (
-          <LoadingSpinner size="lg" text="Searching for music videos..." />
+          <VideoGridSkeleton count={8} />
         ) : !hasSearched ? (
           <EmptyState
             icon={<SearchIcon className="w-16 h-16" />}
