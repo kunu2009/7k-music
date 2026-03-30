@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { YouTubeVideo } from '@/types';
+import { PlayerStatus, YouTubeVideo } from '@/types';
 import { Play, Pause, SkipBack, SkipForward, Heart, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 
 interface MiniPlayerProps {
@@ -16,6 +16,8 @@ interface MiniPlayerProps {
   onToggleFavorite: () => void;
   onToggleMute: () => void;
   isMuted?: boolean;
+  playerStatus?: PlayerStatus;
+  playerErrorCode?: number | null;
   onExpand?: () => void;
 }
 
@@ -32,6 +34,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   onToggleFavorite,
   onToggleMute,
   isMuted = false,
+  playerStatus = 'idle',
+  playerErrorCode = null,
   onExpand,
 }) => {
   const navigate = useNavigate();
@@ -72,6 +76,15 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
       </div>
 
       <div className="container mx-auto px-4 py-3">
+        {(playerStatus === 'loading' || playerStatus === 'buffering' || playerStatus === 'error') && (
+          <div className="mb-2 text-xs text-timberwolf opacity-90">
+            {playerStatus === 'error'
+              ? `Playback error${playerErrorCode ? ` (${playerErrorCode})` : ''}. Trying next track if available.`
+              : playerStatus === 'buffering'
+                ? 'Buffering…'
+                : 'Loading…'}
+          </div>
+        )}
         <div className="flex items-center justify-between gap-4">
           {/* Left: Video Info */}
           <div 

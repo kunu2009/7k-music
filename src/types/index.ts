@@ -103,6 +103,8 @@ export interface PlayerState {
   shuffle: boolean;
 }
 
+export type PlayerStatus = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'error';
+
 // YouTube Player API Types
 export interface YT {
   Player: new (elementId: string, config: YTPlayerConfig) => YTPlayer;

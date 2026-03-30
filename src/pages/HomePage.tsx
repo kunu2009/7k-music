@@ -5,10 +5,12 @@ import { YouTubeVideo } from '@/types';
 import { youtubeApi } from '@/utils/youtube';
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites, usePlaylists } from '@/hooks/useStorage';
+import { PlaylistPickerModal } from '@/components/PlaylistPickerModal';
 import { TrendingUp, Music2 } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
   const [trendingVideos, setTrendingVideos] = useState<YouTubeVideo[]>([]);
+  const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = useState<YouTubeVideo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -47,27 +49,20 @@ export const HomePage: React.FC = () => {
   };
 
   const handleAddToPlaylist = async (video: YouTubeVideo) => {
-    if (playlists.length === 0) {
-      const playlistName = window.prompt('No playlists found. Enter a new playlist name:');
-      if (!playlistName?.trim()) return;
-      const created = await createPlaylist(playlistName.trim());
-      if (created) {
-        await addToPlaylist(created.id, video);
-      }
-      return;
+    setSelectedVideoForPlaylist(video);
+  };
+
+  const handleSelectPlaylist = async (playlistId: string) => {
+    if (!selectedVideoForPlaylist) return;
+    await addToPlaylist(playlistId, selectedVideoForPlaylist);
+  };
+
+  const handleCreateAndAdd = async (playlistName: string) => {
+    if (!selectedVideoForPlaylist) return;
+    const created = await createPlaylist(playlistName);
+    if (created) {
+      await addToPlaylist(created.id, selectedVideoForPlaylist);
     }
-
-    const optionsText = playlists
-      .map((playlist, index) => `${index + 1}. ${playlist.name}`)
-      .join('\n');
-    const selected = window.prompt(`Add to playlist:\n${optionsText}\n\nEnter playlist number:`);
-    const selectedIndex = Number.parseInt(selected || '', 10) - 1;
-
-    if (Number.isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= playlists.length) {
-      return;
-    }
-
-    await addToPlaylist(playlists[selectedIndex].id, video);
   };
 
   return (
@@ -132,6 +127,14 @@ export const HomePage: React.FC = () => {
             YouTube branding and controls are preserved as required.
           </p>
         </div>
+
+        <PlaylistPickerModal
+          isOpen={!!selectedVideoForPlaylist}
+          playlists={playlists}
+          onClose={() => setSelectedVideoForPlaylist(null)}
+          onSelectPlaylist={handleSelectPlaylist}
+          onCreateAndAdd={handleCreateAndAdd}
+        />
       </div>
     </div>
   );

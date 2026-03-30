@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext, useRef, useEffect } from 'react';
-import { YouTubeVideo } from '@/types';
+import { PlayerStatus, YouTubeVideo } from '@/types';
 import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
 import { storage } from '@/utils/storage';
 
@@ -9,6 +9,8 @@ interface PlayerContextType {
   currentIndex: number;
   apiReady: boolean;
   isReady: boolean;
+  playerStatus: PlayerStatus;
+  playerErrorCode: number | null;
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -49,6 +51,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const {
     isPlaying,
+    status,
+    errorCode,
     currentTime,
     duration,
     apiReady,
@@ -70,8 +74,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Auto-play next video
       next();
     },
-    onError: (errorCode) => {
-      if ((errorCode === 101 || errorCode === 150) && queue.length > 1) {
+    onError: (_errorCode) => {
+      if (queue.length > 1) {
         next();
       }
     },
@@ -209,6 +213,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     currentIndex,
     apiReady,
     isReady,
+    playerStatus: status,
+    playerErrorCode: errorCode,
     isPlaying,
     currentTime,
     duration,

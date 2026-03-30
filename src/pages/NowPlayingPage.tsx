@@ -19,6 +19,8 @@ export function NowPlayingPage() {
   const navigate = useNavigate();
   const {
     currentVideo,
+    playerStatus,
+    playerErrorCode,
     isPlaying,
     currentTime,
     duration,
@@ -91,6 +93,15 @@ export function NowPlayingPage() {
       <div className="px-8 py-4">
         <h1 className="text-2xl font-bold mb-2 truncate">{currentVideo.title}</h1>
         <p className="text-gray-400 truncate">{currentVideo.channelTitle}</p>
+        {(playerStatus === 'loading' || playerStatus === 'buffering' || playerStatus === 'error') && (
+          <p className="text-xs text-gray-400 mt-2">
+            {playerStatus === 'error'
+              ? `Playback error${playerErrorCode ? ` (${playerErrorCode})` : ''}. Skipping when possible.`
+              : playerStatus === 'buffering'
+                ? 'Buffering…'
+                : 'Loading…'}
+          </p>
+        )}
       </div>
 
       {/* Progress Bar */}

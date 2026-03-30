@@ -9,6 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
         name: '7K Music',
@@ -39,16 +40,34 @@ export default defineConfig({
         ]
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        cacheId: '7k-music-v1',
         // Cache all static assets
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        // Don't cache YouTube or API responses
-        navigateFallback: null,
+        navigateFallback: '/offline.html',
         runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/www\.googleapis\.com\/youtube\/v3\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'youtube-api-v1',
+              networkTimeoutSeconds: 4,
+              expiration: {
+                maxEntries: 120,
+                maxAgeSeconds: 60 * 60 * 2
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
           {
             urlPattern: /^https:\/\/i\.ytimg\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'youtube-thumbnails',
+              cacheName: 'youtube-thumbnails-v1',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days

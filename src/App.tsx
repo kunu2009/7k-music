@@ -18,6 +18,8 @@ function PlayerWrapper() {
   const {
     currentVideo,
     apiReady,
+    playerStatus,
+    playerErrorCode,
     isPlaying,
     currentTime,
     duration,
@@ -132,6 +134,8 @@ function PlayerWrapper() {
           onToggleFavorite={handleToggleFavorite}
           onToggleMute={toggleMute}
           isMuted={isMuted}
+          playerStatus={playerStatus}
+          playerErrorCode={playerErrorCode}
         />
       )}
     </>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { YTPlayer, YouTubeVideo } from '@/types';
+import { PlayerStatus, YTPlayer, YouTubeVideo } from '@/types';
 
 interface UseYouTubePlayerOptions {
   onVideoEnd?: () => void;
@@ -10,6 +10,8 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
   const [player, setPlayer] = useState<YTPlayer | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [status, setStatus] = useState<PlayerStatus>('idle');
+  const [errorCode, setErrorCode] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [apiReady, setApiReady] = useState(false);
@@ -92,6 +94,8 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
           onReady: (event) => {
             console.log('✅ Player Ready');
             setIsReady(true);
+            setStatus('paused');
+            setErrorCode(null);
             setPlayer(event.target);
             playerRef.current = event.target;
           },
@@ -101,13 +105,18 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
             // -1 = unstarted, 0 = ended, 1 = playing, 2 = paused, 3 = buffering, 5 = cued
             if (state === 1) {
               setIsPlaying(true);
+              setStatus('playing');
               setDuration(event.target.getDuration());
               startProgressTracking();
             } else if (state === 2) {
               setIsPlaying(false);
+              setStatus('paused');
               stopProgressTracking();
+            } else if (state === 3) {
+              setStatus('buffering');
             } else if (state === 0) {
               setIsPlaying(false);
+              setStatus('paused');
               stopProgressTracking();
               options.onVideoEnd?.();
             }
@@ -133,6 +142,8 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
             
             options.onError?.(event.data);
             setIsPlaying(false);
+            setStatus('error');
+            setErrorCode(event.data);
           },
         },
       });
@@ -174,6 +185,7 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
     console.log('▶️ Play called - Player exists:', !!playerRef.current, 'Is ready:', isReady);
     if (playerRef.current && isReady) {
       try {
+        setErrorCode(null);
         playerRef.current.playVideo();
       } catch (error) {
         console.error('Error playing video:', error);
@@ -200,6 +212,8 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
     console.log('📼 Loading video:', video.title, 'Player ready:', isReady, 'Autoplay:', autoplay);
     if (playerRef.current && isReady) {
       try {
+        setStatus('loading');
+        setErrorCode(null);
         if (autoplay) {
           playerRef.current.loadVideoById(video.id);
         } else {
@@ -239,6 +253,8 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
     player,
     isReady,
     isPlaying,
+    status,
+    errorCode,
     currentTime,
     duration,
     apiReady,
