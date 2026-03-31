@@ -164,6 +164,17 @@ export const storage = {
     await db.put('playlists', playlist);
   },
 
+  async removeManyFromPlaylist(playlistId: string, videoIds: string[]): Promise<void> {
+    const db = await getDB();
+    const playlist = await db.get('playlists', playlistId);
+    if (!playlist) throw new Error('Playlist not found');
+
+    const removeSet = new Set(videoIds);
+    playlist.videos = playlist.videos.filter((video) => !removeSet.has(video.id));
+    playlist.updatedAt = new Date().toISOString();
+    await db.put('playlists', playlist);
+  },
+
   async reorderPlaylistVideos(playlistId: string, videoIdsInOrder: string[]): Promise<void> {
     const db = await getDB();
     const playlist = await db.get('playlists', playlistId);

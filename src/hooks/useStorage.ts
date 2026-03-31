@@ -130,6 +130,15 @@ export function usePlaylists() {
     }
   }, [loadPlaylists]);
 
+  const removeManyFromPlaylist = useCallback(async (playlistId: string, videoIds: string[]) => {
+    try {
+      await storage.removeManyFromPlaylist(playlistId, videoIds);
+      await loadPlaylists();
+    } catch (error) {
+      console.error('Error removing multiple videos from playlist:', error);
+    }
+  }, [loadPlaylists]);
+
   const reorderPlaylists = useCallback(async (playlistIdsInOrder: string[]) => {
     try {
       await storage.reorderPlaylists(playlistIdsInOrder);
@@ -157,6 +166,7 @@ export function usePlaylists() {
     duplicatePlaylist,
     addToPlaylist,
     removeFromPlaylist,
+    removeManyFromPlaylist,
     reorderPlaylists,
     reorderPlaylistVideos,
     refresh: loadPlaylists,
