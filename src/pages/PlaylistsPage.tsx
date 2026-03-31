@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { usePlaylists } from '@/hooks/useStorage';
 import { LoadingSpinner, EmptyState } from '@/components/common';
-import { Library, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Library, Plus, Trash2 } from 'lucide-react';
 
 export const PlaylistsPage: React.FC = () => {
-  const { playlists, loading, createPlaylist, deletePlaylist } = usePlaylists();
+  const { playlists, loading, createPlaylist, deletePlaylist, reorderPlaylists } = usePlaylists();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
 
@@ -20,6 +20,18 @@ export const PlaylistsPage: React.FC = () => {
     if (confirm('Are you sure you want to delete this playlist?')) {
       await deletePlaylist(id);
     }
+  };
+
+  const movePlaylist = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= playlists.length) {
+      return;
+    }
+
+    const reordered = [...playlists];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
+    await reorderPlaylists(reordered.map((playlist) => playlist.id));
   };
 
   return (
@@ -68,16 +80,42 @@ export const PlaylistsPage: React.FC = () => {
               >
                 <div className="flex items-start justify-between mb-4">
                   <Library className="w-12 h-12 text-calypso" />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePlaylist(playlist.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-500 rounded-full transition-all"
-                    aria-label="Delete playlist"
-                  >
-                    <Trash2 className="w-4 h-4 text-white" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const index = playlists.findIndex((p) => p.id === playlist.id);
+                        void movePlaylist(index, 'up');
+                      }}
+                      disabled={playlists[0]?.id === playlist.id}
+                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="Move playlist up"
+                    >
+                      <ArrowUp className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const index = playlists.findIndex((p) => p.id === playlist.id);
+                        void movePlaylist(index, 'down');
+                      }}
+                      disabled={playlists[playlists.length - 1]?.id === playlist.id}
+                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="Move playlist down"
+                    >
+                      <ArrowDown className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePlaylist(playlist.id);
+                      }}
+                      className="p-2 hover:bg-red-500 rounded-full transition-all"
+                      aria-label="Delete playlist"
+                    >
+                      <Trash2 className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
                 </div>
                 <h3 className="text-white font-semibold text-lg mb-2">
                   {playlist.name}

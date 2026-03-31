@@ -69,10 +69,12 @@ export const storage = {
   // ===== PLAYLISTS =====
   async createPlaylist(name: string): Promise<Playlist> {
     const db = await getDB();
+    const now = Date.now();
     const playlist: Playlist = {
-      id: `playlist-${Date.now()}`,
+      id: `playlist-${now}`,
       name,
       videos: [],
+      order: now,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -82,7 +84,15 @@ export const storage = {
 
   async getPlaylists(): Promise<Playlist[]> {
     const db = await getDB();
-    return await db.getAll('playlists');
+    const playlists = await db.getAll('playlists');
+    return playlists.sort((a, b) => {
+      const aOrder = a.order ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = b.order ?? Number.MAX_SAFE_INTEGER;
+      if (aOrder === bOrder) {
+        return b.updatedAt.localeCompare(a.updatedAt);
+      }
+      return aOrder - bOrder;
+    });
   },
 
   async getPlaylist(id: string): Promise<Playlist | undefined> {
@@ -122,6 +132,24 @@ export const storage = {
     playlist.videos = playlist.videos.filter(v => v.id !== videoId);
     playlist.updatedAt = new Date().toISOString();
     await db.put('playlists', playlist);
+  },
+
+  async reorderPlaylists(playlistIdsInOrder: string[]): Promise<void> {
+    const db = await getDB();
+    const tx = db.transaction('playlists', 'readwrite');
+    const playlists = await tx.store.getAll();
+    const byId = new Map(playlists.map((playlist) => [playlist.id, playlist]));
+
+    for (let index = 0; index < playlistIdsInOrder.length; index += 1) {
+      const playlist = byId.get(playlistIdsInOrder[index]);
+      if (!playlist) continue;
+      if (playlist.order !== index) {
+        playlist.order = index;
+        await tx.store.put(playlist);
+      }
+    }
+
+    await tx.done;
   },
 
   // ===== RECENTLY PLAYED =====

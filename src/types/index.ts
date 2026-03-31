@@ -90,6 +90,7 @@ export interface Playlist {
   id: string;
   name: string;
   videos: YouTubeVideo[];
+  order?: number;
   createdAt: string;
   updatedAt: string;
 }
