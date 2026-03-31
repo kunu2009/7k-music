@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePlaylists } from '@/hooks/useStorage';
 import { LoadingSpinner, EmptyState } from '@/components/common';
-import { ArrowDown, ArrowUp, Library, Plus, Trash2 } from 'lucide-react';
+import { GripVertical, Library, Plus, Trash2 } from 'lucide-react';
+import { Playlist } from '@/types';
 
 export const PlaylistsPage: React.FC = () => {
   const { playlists, loading, createPlaylist, deletePlaylist, reorderPlaylists } = usePlaylists();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
+  const [orderedPlaylists, setOrderedPlaylists] = useState<Playlist[]>([]);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOrderedPlaylists(playlists);
+  }, [playlists]);
 
   const handleCreatePlaylist = async () => {
     if (playlistName.trim()) {
@@ -22,16 +30,49 @@ export const PlaylistsPage: React.FC = () => {
     }
   };
 
-  const movePlaylist = async (index: number, direction: 'up' | 'down') => {
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= playlists.length) {
+  const movePlaylist = (items: Playlist[], fromIndex: number, toIndex: number): Playlist[] => {
+    const reordered = [...items];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    return reordered;
+  };
+
+  const handleDragStart = (playlistId: string) => {
+    setDraggingId(playlistId);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>, playlistId: string) => {
+    event.preventDefault();
+    if (draggingId && draggingId !== playlistId) {
+      setDragOverId(playlistId);
+    }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>, dropId: string) => {
+    event.preventDefault();
+    if (!draggingId || draggingId === dropId) {
+      setDragOverId(null);
       return;
     }
 
-    const reordered = [...playlists];
-    const [moved] = reordered.splice(index, 1);
-    reordered.splice(targetIndex, 0, moved);
+    const fromIndex = orderedPlaylists.findIndex((playlist) => playlist.id === draggingId);
+    const toIndex = orderedPlaylists.findIndex((playlist) => playlist.id === dropId);
+    if (fromIndex === -1 || toIndex === -1) {
+      setDragOverId(null);
+      setDraggingId(null);
+      return;
+    }
+
+    const reordered = movePlaylist(orderedPlaylists, fromIndex, toIndex);
+    setOrderedPlaylists(reordered);
+    setDragOverId(null);
+    setDraggingId(null);
     await reorderPlaylists(reordered.map((playlist) => playlist.id));
+  };
+
+  const handleDragEnd = () => {
+    setDragOverId(null);
+    setDraggingId(null);
   };
 
   return (
@@ -61,7 +102,7 @@ export const PlaylistsPage: React.FC = () => {
         {/* Content */}
         {loading ? (
           <LoadingSpinner size="lg" text="Loading playlists..." />
-        ) : playlists.length === 0 ? (
+        ) : orderedPlaylists.length === 0 ? (
           <EmptyState
             icon={<Library className="w-16 h-16" />}
             title="No Playlists Yet"
@@ -73,38 +114,29 @@ export const PlaylistsPage: React.FC = () => {
           />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {playlists.map((playlist) => (
+            {orderedPlaylists.map((playlist) => (
               <div
                 key={playlist.id}
-                className="bg-gable-green rounded-lg p-6 hover:bg-chathams-blue transition-colors cursor-pointer group"
+                draggable
+                onDragStart={() => handleDragStart(playlist.id)}
+                onDragOver={(event) => handleDragOver(event, playlist.id)}
+                onDrop={(event) => {
+                  void handleDrop(event, playlist.id);
+                }}
+                onDragEnd={handleDragEnd}
+                className={`bg-gable-green rounded-lg p-6 hover:bg-chathams-blue transition-colors cursor-grab active:cursor-grabbing group ${
+                  dragOverId === playlist.id ? 'ring-2 ring-calypso' : ''
+                } ${draggingId === playlist.id ? 'opacity-60' : ''}`}
               >
                 <div className="flex items-start justify-between mb-4">
-                  <Library className="w-12 h-12 text-calypso" />
+                  <div className="flex items-center gap-2">
+                    <Library className="w-12 h-12 text-calypso" />
+                    <div className="text-timberwolf opacity-70 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs uppercase tracking-wide">
+                      <GripVertical className="w-4 h-4" />
+                      Drag
+                    </div>
+                  </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const index = playlists.findIndex((p) => p.id === playlist.id);
-                        void movePlaylist(index, 'up');
-                      }}
-                      disabled={playlists[0]?.id === playlist.id}
-                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="Move playlist up"
-                    >
-                      <ArrowUp className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const index = playlists.findIndex((p) => p.id === playlist.id);
-                        void movePlaylist(index, 'down');
-                      }}
-                      disabled={playlists[playlists.length - 1]?.id === playlist.id}
-                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="Move playlist down"
-                    >
-                      <ArrowDown className="w-4 h-4 text-white" />
-                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
