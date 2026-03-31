@@ -139,6 +139,15 @@ export function usePlaylists() {
     }
   }, [loadPlaylists]);
 
+  const reorderPlaylistVideos = useCallback(async (playlistId: string, videoIdsInOrder: string[]) => {
+    try {
+      await storage.reorderPlaylistVideos(playlistId, videoIdsInOrder);
+      await loadPlaylists();
+    } catch (error) {
+      console.error('Error reordering playlist videos:', error);
+    }
+  }, [loadPlaylists]);
+
   return {
     playlists,
     loading,
@@ -149,6 +158,7 @@ export function usePlaylists() {
     addToPlaylist,
     removeFromPlaylist,
     reorderPlaylists,
+    reorderPlaylistVideos,
     refresh: loadPlaylists,
   };
 }

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Heart, Library, Play, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, GripVertical, Heart, Library, Play, Trash2 } from 'lucide-react';
 import { LoadingSpinner, EmptyState } from '@/components/common';
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites, usePlaylists } from '@/hooks/useStorage';
@@ -11,19 +11,38 @@ export const PlaylistDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { playlistId } = useParams<{ playlistId: string }>();
   const { playVideo } = usePlayer();
-  const { playlists, loading, removeFromPlaylist } = usePlaylists();
+  const { playlists, loading, removeFromPlaylist, reorderPlaylistVideos } = usePlaylists();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const [orderedVideos, setOrderedVideos] = useState<YouTubeVideo[]>([]);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const playlist = playlists.find((item) => item.id === playlistId);
 
-  const handlePlayVideo = (video: YouTubeVideo) => {
+  useEffect(() => {
+    setOrderedVideos(playlist?.videos ?? []);
+  }, [playlist]);
+
+  const moveVideo = (items: YouTubeVideo[], fromIndex: number, toIndex: number): YouTubeVideo[] => {
+    const reordered = [...items];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    return reordered;
+  };
+
+  const persistVideoOrder = async (videos: YouTubeVideo[]) => {
     if (!playlist) return;
-    playVideo(video, playlist.videos);
+    setOrderedVideos(videos);
+    await reorderPlaylistVideos(playlist.id, videos.map((video) => video.id));
+  };
+
+  const handlePlayVideo = (video: YouTubeVideo) => {
+    playVideo(video, orderedVideos);
   };
 
   const handlePlayAll = () => {
-    if (!playlist || playlist.videos.length === 0) return;
-    playVideo(playlist.videos[0], playlist.videos);
+    if (!playlist || orderedVideos.length === 0) return;
+    playVideo(orderedVideos[0], orderedVideos);
   };
 
   const handleRemoveVideo = async (videoId: string) => {
@@ -37,6 +56,55 @@ export const PlaylistDetailPage: React.FC = () => {
       return;
     }
     await addFavorite(video);
+  };
+
+  const moveVideoByStep = async (videoId: string, step: -1 | 1) => {
+    const fromIndex = orderedVideos.findIndex((video) => video.id === videoId);
+    if (fromIndex < 0) return;
+
+    const toIndex = fromIndex + step;
+    if (toIndex < 0 || toIndex >= orderedVideos.length) return;
+
+    const reordered = moveVideo(orderedVideos, fromIndex, toIndex);
+    await persistVideoOrder(reordered);
+  };
+
+  const handleDragStart = (videoId: string) => {
+    setDraggingId(videoId);
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>, videoId: string) => {
+    event.preventDefault();
+    if (draggingId && draggingId !== videoId) {
+      setDragOverId(videoId);
+    }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>, dropId: string) => {
+    event.preventDefault();
+    if (!draggingId || draggingId === dropId) {
+      setDragOverId(null);
+      setDraggingId(null);
+      return;
+    }
+
+    const fromIndex = orderedVideos.findIndex((video) => video.id === draggingId);
+    const toIndex = orderedVideos.findIndex((video) => video.id === dropId);
+    if (fromIndex < 0 || toIndex < 0) {
+      setDragOverId(null);
+      setDraggingId(null);
+      return;
+    }
+
+    const reordered = moveVideo(orderedVideos, fromIndex, toIndex);
+    setDragOverId(null);
+    setDraggingId(null);
+    await persistVideoOrder(reordered);
+  };
+
+  const handleDragEnd = () => {
+    setDragOverId(null);
+    setDraggingId(null);
   };
 
   if (loading) {
@@ -89,13 +157,13 @@ export const PlaylistDetailPage: React.FC = () => {
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">{playlist.name}</h2>
             <p className="text-timberwolf opacity-75">
-              {playlist.videos.length} {playlist.videos.length === 1 ? 'video' : 'videos'}
+              {orderedVideos.length} {orderedVideos.length === 1 ? 'video' : 'videos'}
             </p>
           </div>
 
           <button
             onClick={handlePlayAll}
-            disabled={playlist.videos.length === 0}
+            disabled={orderedVideos.length === 0}
             className="px-5 py-3 bg-calypso hover:bg-chathams-blue disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full transition-colors inline-flex items-center gap-2"
           >
             <Play className="w-4 h-4 fill-white" />
@@ -103,7 +171,7 @@ export const PlaylistDetailPage: React.FC = () => {
           </button>
         </div>
 
-        {playlist.videos.length === 0 ? (
+        {orderedVideos.length === 0 ? (
           <EmptyState
             icon={<Library className="w-16 h-16" />}
             title="No songs in this playlist"
@@ -111,11 +179,25 @@ export const PlaylistDetailPage: React.FC = () => {
           />
         ) : (
           <div className="space-y-3">
-            {playlist.videos.map((video, index) => (
+            {orderedVideos.map((video, index) => (
               <div
                 key={video.id}
-                className="bg-gable-green/90 border border-white/5 rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4"
+                draggable
+                onDragStart={() => handleDragStart(video.id)}
+                onDragOver={(event) => handleDragOver(event, video.id)}
+                onDrop={(event) => {
+                  void handleDrop(event, video.id);
+                }}
+                onDragEnd={handleDragEnd}
+                className={`bg-gable-green/90 border border-white/5 rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all ${
+                  dragOverId === video.id ? 'ring-2 ring-calypso' : ''
+                } ${draggingId === video.id ? 'opacity-60' : ''}`}
               >
+                <div className="hidden sm:flex flex-col items-center text-timberwolf opacity-70">
+                  <GripVertical className="w-4 h-4" />
+                  <span className="text-[10px] uppercase tracking-wide">Drag</span>
+                </div>
+
                 <button
                   onClick={() => handlePlayVideo(video)}
                   className="relative shrink-0 rounded-lg overflow-hidden group"
@@ -142,6 +224,22 @@ export const PlaylistDetailPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1 sm:gap-2">
+                  <button
+                    onClick={() => void moveVideoByStep(video.id, -1)}
+                    disabled={index === 0}
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label={`Move ${video.title} up`}
+                  >
+                    <ArrowUp className="w-4 h-4 text-white" />
+                  </button>
+                  <button
+                    onClick={() => void moveVideoByStep(video.id, 1)}
+                    disabled={index === orderedVideos.length - 1}
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label={`Move ${video.title} down`}
+                  >
+                    <ArrowDown className="w-4 h-4 text-white" />
+                  </button>
                   <button
                     onClick={() => void handleToggleFavorite(video)}
                     className="p-2 rounded-full hover:bg-white/10 transition-colors"

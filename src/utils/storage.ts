@@ -164,6 +164,28 @@ export const storage = {
     await db.put('playlists', playlist);
   },
 
+  async reorderPlaylistVideos(playlistId: string, videoIdsInOrder: string[]): Promise<void> {
+    const db = await getDB();
+    const playlist = await db.get('playlists', playlistId);
+    if (!playlist) throw new Error('Playlist not found');
+
+    const byId = new Map(playlist.videos.map((video) => [video.id, video]));
+    const reordered = videoIdsInOrder
+      .map((videoId) => byId.get(videoId))
+      .filter((video): video is YouTubeVideo => !!video);
+
+    const includedIds = new Set(reordered.map((video) => video.id));
+    for (const video of playlist.videos) {
+      if (!includedIds.has(video.id)) {
+        reordered.push(video);
+      }
+    }
+
+    playlist.videos = reordered;
+    playlist.updatedAt = new Date().toISOString();
+    await db.put('playlists', playlist);
+  },
+
   async reorderPlaylists(playlistIdsInOrder: string[]): Promise<void> {
     const db = await getDB();
     const tx = db.transaction('playlists', 'readwrite');
