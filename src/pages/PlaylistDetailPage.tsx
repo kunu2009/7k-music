@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, GripVertical, Heart, Library, Play, Square, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, GripVertical, Heart, Library, Play, Plus, SkipForward, Square, Trash2, X } from 'lucide-react';
 import { LoadingSpinner, EmptyState } from '@/components/common';
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites, usePlaylists } from '@/hooks/useStorage';
@@ -10,7 +10,7 @@ import { youtubeApi } from '@/utils/youtube';
 export const PlaylistDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { playlistId } = useParams<{ playlistId: string }>();
-  const { playVideo } = usePlayer();
+  const { playVideo, addToQueue, addToQueueNext } = usePlayer();
   const { playlists, loading, removeFromPlaylist, removeManyFromPlaylist, reorderPlaylistVideos } = usePlaylists();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [orderedVideos, setOrderedVideos] = useState<YouTubeVideo[]>([]);
@@ -70,6 +70,20 @@ export const PlaylistDetailPage: React.FC = () => {
       return;
     }
     await addFavorite(video);
+  };
+
+  const handlePlayNext = (video: YouTubeVideo) => {
+    if (isSelectMode) {
+      return;
+    }
+    addToQueueNext(video);
+  };
+
+  const handleAddToQueue = (video: YouTubeVideo) => {
+    if (isSelectMode) {
+      return;
+    }
+    addToQueue(video);
   };
 
   const moveVideoByStep = async (videoId: string, step: -1 | 1) => {
@@ -370,6 +384,22 @@ export const PlaylistDetailPage: React.FC = () => {
                     aria-label={`Remove ${video.title} from playlist`}
                   >
                     <Trash2 className="w-4 h-4 text-white" />
+                  </button>
+                  <button
+                    onClick={() => handlePlayNext(video)}
+                    disabled={isSelectMode}
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label={`Play ${video.title} next`}
+                  >
+                    <SkipForward className="w-4 h-4 text-white" />
+                  </button>
+                  <button
+                    onClick={() => handleAddToQueue(video)}
+                    disabled={isSelectMode}
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label={`Add ${video.title} to queue`}
+                  >
+                    <Plus className="w-4 h-4 text-white" />
                   </button>
                 </div>
               </div>

@@ -39,6 +39,7 @@ interface PlayerContextType {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   addToQueue: (video: YouTubeVideo) => void;
+  addToQueueNext: (video: YouTubeVideo) => void;
   initPlayer: (elementId: string) => void;
 }
 
@@ -309,6 +310,30 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setQueue(prev => [...prev, video]);
   };
 
+  const addToQueueNext = (video: YouTubeVideo) => {
+    setQueue((prev) => {
+      const withoutVideo = prev.filter((item) => item.id !== video.id);
+
+      if (withoutVideo.length === 0) {
+        if (currentVideo) {
+          setCurrentIndex(0);
+          return [currentVideo, video];
+        }
+        setCurrentIndex(0);
+        return [video];
+      }
+
+      const hasCurrentInQueue = currentVideo
+        ? withoutVideo.findIndex((item) => item.id === currentVideo.id)
+        : -1;
+      const insertAt = hasCurrentInQueue >= 0 ? hasCurrentInQueue + 1 : Math.min(currentIndex + 1, withoutVideo.length);
+
+      const nextQueue = [...withoutVideo];
+      nextQueue.splice(insertAt, 0, video);
+      return nextQueue;
+    });
+  };
+
   const toggleShuffle = () => {
     const newShuffle = !shuffle;
     setShuffle(newShuffle);
@@ -352,6 +377,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toggleShuffle,
     toggleRepeat,
     addToQueue,
+    addToQueueNext,
     initPlayer,
   };
 
