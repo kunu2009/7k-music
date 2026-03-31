@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePlaylists } from '@/hooks/useStorage';
 import { LoadingSpinner, EmptyState } from '@/components/common';
 import { ArrowDown, ArrowUp, Copy, GripVertical, Library, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Playlist } from '@/types';
 
 export const PlaylistsPage: React.FC = () => {
+  const navigate = useNavigate();
   const {
     playlists,
     loading,
@@ -159,6 +161,7 @@ export const PlaylistsPage: React.FC = () => {
                   void handleDrop(event, playlist.id);
                 }}
                 onDragEnd={handleDragEnd}
+                onClick={() => navigate(`/playlists/${playlist.id}`)}
                 className={`bg-gable-green rounded-lg p-6 hover:bg-chathams-blue transition-colors cursor-grab active:cursor-grabbing group ${
                   dragOverId === playlist.id ? 'ring-2 ring-calypso' : ''
                 } ${draggingId === playlist.id ? 'opacity-60' : ''}`}

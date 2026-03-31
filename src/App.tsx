@@ -10,6 +10,7 @@ import { HomePage } from '@/pages/HomePage';
 import { SearchPage } from '@/pages/SearchPage';
 import { FavoritesPage } from '@/pages/FavoritesPage';
 import { PlaylistsPage } from '@/pages/PlaylistsPage';
+import { PlaylistDetailPage } from '@/pages/PlaylistDetailPage';
 import { MyMusicPage } from '@/pages/MyMusicPage';
 import { NowPlayingPage } from '@/pages/NowPlayingPage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
@@ -174,6 +175,7 @@ function PlayerWrapper() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/favorites" element={<FavoritesPage />} />
         <Route path="/playlists" element={<PlaylistsPage />} />
+        <Route path="/playlists/:playlistId" element={<PlaylistDetailPage />} />
         <Route path="/my-music" element={<MyMusicPage />} />
         <Route path="/now-playing" element={<NowPlayingPage />} />
         <Route path="/categories" element={<CategoriesPage />} />
