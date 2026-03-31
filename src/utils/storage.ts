@@ -106,6 +106,36 @@ export const storage = {
     await db.put('playlists', playlist);
   },
 
+  async renamePlaylist(id: string, name: string): Promise<void> {
+    const db = await getDB();
+    const playlist = await db.get('playlists', id);
+    if (!playlist) throw new Error('Playlist not found');
+
+    playlist.name = name;
+    playlist.updatedAt = new Date().toISOString();
+    await db.put('playlists', playlist);
+  },
+
+  async duplicatePlaylist(id: string): Promise<Playlist> {
+    const db = await getDB();
+    const source = await db.get('playlists', id);
+    if (!source) throw new Error('Playlist not found');
+
+    const now = Date.now();
+    const duplicated: Playlist = {
+      ...source,
+      id: `playlist-${now}`,
+      name: `${source.name} (Copy)`,
+      videos: [...source.videos],
+      order: now,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await db.add('playlists', duplicated);
+    return duplicated;
+  },
+
   async deletePlaylist(id: string): Promise<void> {
     const db = await getDB();
     await db.delete('playlists', id);

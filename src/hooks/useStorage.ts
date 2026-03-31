@@ -92,6 +92,26 @@ export function usePlaylists() {
     }
   }, [loadPlaylists]);
 
+  const renamePlaylist = useCallback(async (id: string, name: string) => {
+    try {
+      await storage.renamePlaylist(id, name);
+      await loadPlaylists();
+    } catch (error) {
+      console.error('Error renaming playlist:', error);
+    }
+  }, [loadPlaylists]);
+
+  const duplicatePlaylist = useCallback(async (id: string) => {
+    try {
+      const playlist = await storage.duplicatePlaylist(id);
+      await loadPlaylists();
+      return playlist;
+    } catch (error) {
+      console.error('Error duplicating playlist:', error);
+      return undefined;
+    }
+  }, [loadPlaylists]);
+
   const addToPlaylist = useCallback(async (playlistId: string, video: YouTubeVideo) => {
     try {
       await storage.addToPlaylist(playlistId, video);
@@ -124,6 +144,8 @@ export function usePlaylists() {
     loading,
     createPlaylist,
     deletePlaylist,
+    renamePlaylist,
+    duplicatePlaylist,
     addToPlaylist,
     removeFromPlaylist,
     reorderPlaylists,

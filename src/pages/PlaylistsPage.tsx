@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { usePlaylists } from '@/hooks/useStorage';
 import { LoadingSpinner, EmptyState } from '@/components/common';
-import { GripVertical, Library, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, GripVertical, Library, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Playlist } from '@/types';
 
 export const PlaylistsPage: React.FC = () => {
-  const { playlists, loading, createPlaylist, deletePlaylist, reorderPlaylists } = usePlaylists();
+  const {
+    playlists,
+    loading,
+    createPlaylist,
+    deletePlaylist,
+    renamePlaylist,
+    duplicatePlaylist,
+    reorderPlaylists,
+  } = usePlaylists();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
   const [orderedPlaylists, setOrderedPlaylists] = useState<Playlist[]>([]);
@@ -30,11 +38,39 @@ export const PlaylistsPage: React.FC = () => {
     }
   };
 
+  const handleRenamePlaylist = async (playlist: Playlist) => {
+    const nextName = prompt('Rename playlist', playlist.name)?.trim();
+    if (!nextName || nextName === playlist.name) {
+      return;
+    }
+    await renamePlaylist(playlist.id, nextName);
+  };
+
+  const handleDuplicatePlaylist = async (playlistId: string) => {
+    await duplicatePlaylist(playlistId);
+  };
+
   const movePlaylist = (items: Playlist[], fromIndex: number, toIndex: number): Playlist[] => {
     const reordered = [...items];
     const [moved] = reordered.splice(fromIndex, 1);
     reordered.splice(toIndex, 0, moved);
     return reordered;
+  };
+
+  const persistReorder = async (reordered: Playlist[]) => {
+    setOrderedPlaylists(reordered);
+    await reorderPlaylists(reordered.map((playlist) => playlist.id));
+  };
+
+  const movePlaylistByStep = async (playlistId: string, step: -1 | 1) => {
+    const fromIndex = orderedPlaylists.findIndex((playlist) => playlist.id === playlistId);
+    if (fromIndex < 0) return;
+
+    const toIndex = fromIndex + step;
+    if (toIndex < 0 || toIndex >= orderedPlaylists.length) return;
+
+    const reordered = movePlaylist(orderedPlaylists, fromIndex, toIndex);
+    await persistReorder(reordered);
   };
 
   const handleDragStart = (playlistId: string) => {
@@ -64,10 +100,9 @@ export const PlaylistsPage: React.FC = () => {
     }
 
     const reordered = movePlaylist(orderedPlaylists, fromIndex, toIndex);
-    setOrderedPlaylists(reordered);
     setDragOverId(null);
     setDraggingId(null);
-    await reorderPlaylists(reordered.map((playlist) => playlist.id));
+    await persistReorder(reordered);
   };
 
   const handleDragEnd = () => {
@@ -136,7 +171,49 @@ export const PlaylistsPage: React.FC = () => {
                       Drag
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void movePlaylistByStep(playlist.id, -1);
+                      }}
+                      disabled={orderedPlaylists[0]?.id === playlist.id}
+                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="Move playlist up"
+                    >
+                      <ArrowUp className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void movePlaylistByStep(playlist.id, 1);
+                      }}
+                      disabled={orderedPlaylists[orderedPlaylists.length - 1]?.id === playlist.id}
+                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      aria-label="Move playlist down"
+                    >
+                      <ArrowDown className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleRenamePlaylist(playlist);
+                      }}
+                      className="p-2 hover:bg-white/10 rounded-full transition-all"
+                      aria-label="Rename playlist"
+                    >
+                      <Pencil className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDuplicatePlaylist(playlist.id);
+                      }}
+                      className="p-2 hover:bg-white/10 rounded-full transition-all"
+                      aria-label="Duplicate playlist"
+                    >
+                      <Copy className="w-4 h-4 text-white" />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
