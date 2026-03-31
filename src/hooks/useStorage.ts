@@ -139,6 +139,15 @@ export function usePlaylists() {
     }
   }, [loadPlaylists]);
 
+  const replacePlaylistVideos = useCallback(async (playlistId: string, videos: YouTubeVideo[]) => {
+    try {
+      await storage.replacePlaylistVideos(playlistId, videos);
+      await loadPlaylists();
+    } catch (error) {
+      console.error('Error replacing playlist videos:', error);
+    }
+  }, [loadPlaylists]);
+
   const reorderPlaylists = useCallback(async (playlistIdsInOrder: string[]) => {
     try {
       await storage.reorderPlaylists(playlistIdsInOrder);
@@ -167,6 +176,7 @@ export function usePlaylists() {
     addToPlaylist,
     removeFromPlaylist,
     removeManyFromPlaylist,
+    replacePlaylistVideos,
     reorderPlaylists,
     reorderPlaylistVideos,
     refresh: loadPlaylists,

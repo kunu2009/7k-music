@@ -11,13 +11,18 @@ export const PlaylistDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { playlistId } = useParams<{ playlistId: string }>();
   const { playVideo, addToQueue, addToQueueNext } = usePlayer();
-  const { playlists, loading, removeFromPlaylist, removeManyFromPlaylist, reorderPlaylistVideos } = usePlaylists();
+  const { playlists, loading, removeFromPlaylist, removeManyFromPlaylist, replacePlaylistVideos, reorderPlaylistVideos } = usePlaylists();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [orderedVideos, setOrderedVideos] = useState<YouTubeVideo[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
+  const [undoBulkRemove, setUndoBulkRemove] = useState<{
+    playlistId: string;
+    previousVideos: YouTubeVideo[];
+    removedCount: number;
+  } | null>(null);
 
   const playlist = playlists.find((item) => item.id === playlistId);
 
@@ -30,6 +35,18 @@ export const PlaylistDetailPage: React.FC = () => {
       setSelectedVideoIds([]);
     }
   }, [isSelectMode]);
+
+  useEffect(() => {
+    if (!undoBulkRemove) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setUndoBulkRemove(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timeout);
+  }, [undoBulkRemove]);
 
   const moveVideo = (items: YouTubeVideo[], fromIndex: number, toIndex: number): YouTubeVideo[] => {
     const reordered = [...items];
@@ -177,9 +194,25 @@ export const PlaylistDetailPage: React.FC = () => {
       return;
     }
 
+    const previousVideos = [...orderedVideos];
     await removeManyFromPlaylist(playlist.id, selectedVideoIds);
+    setUndoBulkRemove({
+      playlistId: playlist.id,
+      previousVideos,
+      removedCount: selectedCount,
+    });
     setSelectedVideoIds([]);
     setIsSelectMode(false);
+  };
+
+  const handleUndoBulkRemove = async () => {
+    if (!playlist || !undoBulkRemove || undoBulkRemove.playlistId !== playlist.id) {
+      return;
+    }
+
+    await replacePlaylistVideos(playlist.id, undoBulkRemove.previousVideos);
+    setOrderedVideos(undoBulkRemove.previousVideos);
+    setUndoBulkRemove(null);
   };
 
   if (loading) {
@@ -407,6 +440,22 @@ export const PlaylistDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {undoBulkRemove && undoBulkRemove.playlistId === playlist.id && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 w-full max-w-md">
+          <div className="bg-black/90 border border-white/15 rounded-xl px-4 py-3 flex items-center justify-between gap-3 text-white shadow-2xl">
+            <p className="text-sm">
+              Removed {undoBulkRemove.removedCount} {undoBulkRemove.removedCount === 1 ? 'song' : 'songs'}
+            </p>
+            <button
+              onClick={() => void handleUndoBulkRemove()}
+              className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition-colors text-sm font-semibold"
+            >
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

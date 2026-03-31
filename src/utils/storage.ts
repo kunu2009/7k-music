@@ -175,6 +175,16 @@ export const storage = {
     await db.put('playlists', playlist);
   },
 
+  async replacePlaylistVideos(playlistId: string, videos: YouTubeVideo[]): Promise<void> {
+    const db = await getDB();
+    const playlist = await db.get('playlists', playlistId);
+    if (!playlist) throw new Error('Playlist not found');
+
+    playlist.videos = videos;
+    playlist.updatedAt = new Date().toISOString();
+    await db.put('playlists', playlist);
+  },
+
   async reorderPlaylistVideos(playlistId: string, videoIdsInOrder: string[]): Promise<void> {
     const db = await getDB();
     const playlist = await db.get('playlists', playlistId);
