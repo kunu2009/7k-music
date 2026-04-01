@@ -6,7 +6,7 @@ import { youtubeApi } from '@/utils/youtube';
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites, usePlaylists } from '@/hooks/useStorage';
 import { PlaylistPickerModal } from '@/components/PlaylistPickerModal';
-import { TrendingUp, Music2 } from 'lucide-react';
+import { ShieldCheck, TrendingUp, Music2 } from 'lucide-react';
 
 const HOME_CACHE_KEY = 'home-trending-cache-v1';
 
@@ -97,15 +97,15 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gable-green to-black pt-20 pb-32">
+    <div className="app-page">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
-            <TrendingUp className="w-8 h-8 text-calypso" />
+            <TrendingUp className="w-8 h-8 text-blue-200" />
             <h2 className="text-3xl font-bold text-white">Trending Music</h2>
           </div>
-          <p className="text-timberwolf opacity-75">
+          <p className="text-blue-100/75">
             Discover the hottest music videos trending right now
           </p>
         </div>
@@ -149,9 +149,12 @@ export const HomePage: React.FC = () => {
         )}
 
         {/* Legal Notice */}
-        <div className="mt-12 p-6 bg-chathams-blue bg-opacity-30 rounded-lg border border-calypso">
-          <h3 className="text-white font-semibold mb-2">📜 Legal & Ethical Notice</h3>
-          <p className="text-timberwolf text-sm opacity-90">
+        <div className="mt-12 p-6 glass-surface rounded-2xl">
+          <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-blue-200" />
+            Legal and Ethical Notice
+          </h3>
+          <p className="text-blue-100/80 text-sm">
             All videos are streamed through the official YouTube IFrame Player API. 
             We do not download, store, or modify any copyrighted content. 
             All content remains on YouTube's servers and is subject to their Terms of Service. 

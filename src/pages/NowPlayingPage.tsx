@@ -99,40 +99,42 @@ export function NowPlayingPage() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-b from-gray-900 via-black to-black text-white flex flex-col">
+    <div className="fixed inset-0 z-50 text-white flex flex-col overflow-y-auto bg-[radial-gradient(circle_at_10%_0%,rgba(125,157,255,0.35),transparent_40%),radial-gradient(circle_at_90%_0%,rgba(71,119,255,0.28),transparent_36%),linear-gradient(180deg,#070b18,#0d1734_55%,#090f22)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4">
+      <div className="flex items-center justify-between px-4 py-5">
         <button
           onClick={withHaptic(() => navigate(-1))}
-          className="p-2 hover:bg-white/10 active:scale-95 rounded-full transition-all"
+          className="pill-action p-2.5"
         >
           <ChevronDown className="w-6 h-6" />
         </button>
         <div className="text-center">
-          <p className="text-sm text-gray-400">Now Playing</p>
+          <p className="text-sm text-blue-100/80 tracking-wide">Now Playing</p>
         </div>
-        <button className="p-2 hover:bg-white/10 rounded-full transition">
+        <button className="pill-action p-2.5">
           <MoreVertical className="w-6 h-6" />
         </button>
       </div>
 
       {/* Video Area */}
-      <div className="px-4 sm:px-8 pt-4 pb-4">
-        <div className="mx-auto w-full max-w-[720px] aspect-video rounded-2xl border border-white/10 bg-black/50 relative overflow-hidden">
+      <div className="px-4 sm:px-8 pt-2 pb-4">
+        <div className="mx-auto w-full max-w-[720px] aspect-video rounded-[28px] glass-surface relative overflow-hidden">
+          <div className="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/30 blur-3xl" />
+          <div className="absolute -bottom-12 -right-12 w-52 h-52 bg-cyan-400/20 blur-3xl" />
           {isLoadingState && (
             <div className="absolute inset-0 p-4 animate-pulse">
-              <div className="w-full h-full rounded-xl bg-white/5" />
+              <div className="w-full h-full rounded-2xl bg-white/10" />
             </div>
           )}
         </div>
       </div>
 
       {/* Song Info */}
-      <div className="px-8 py-4">
-        <h1 className="text-2xl font-bold mb-2 truncate">{currentVideo.title}</h1>
-        <p className="text-gray-400 truncate">{currentVideo.channelTitle}</p>
+      <div className="px-6 sm:px-8 py-4">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 truncate">{currentVideo.title}</h1>
+        <p className="text-blue-100/75 truncate">{currentVideo.channelTitle}</p>
         {(playerStatus === 'loading' || playerStatus === 'buffering' || playerStatus === 'error') && (
-          <p className="text-xs text-gray-400 mt-2">
+          <p className="text-xs text-blue-100/70 mt-2">
             {playerStatus === 'error'
               ? `Playback error${playerErrorCode ? ` (${playerErrorCode})` : ''}. Skipping when possible.`
               : playerStatus === 'buffering'
@@ -143,17 +145,27 @@ export function NowPlayingPage() {
       </div>
 
       {/* Progress Bar */}
-      <div className="px-8 py-2">
+      <div className="px-6 sm:px-8 py-2">
+        <svg viewBox="0 0 360 36" className="w-full h-9 mb-3 opacity-85" aria-hidden="true">
+          <defs>
+            <linearGradient id="waveGradient" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0%" stopColor="#8cb6ff" stopOpacity="0.35" />
+              <stop offset="50%" stopColor="#d4e4ff" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="#7aa1ff" stopOpacity="0.35" />
+            </linearGradient>
+          </defs>
+          <path d="M0 18 Q8 8 16 18 T32 18 T48 18 T64 18 T80 18 T96 18 T112 18 T128 18 T144 18 T160 18 T176 18 T192 18 T208 18 T224 18 T240 18 T256 18 T272 18 T288 18 T304 18 T320 18 T336 18 T352 18" stroke="url(#waveGradient)" strokeWidth="2.2" fill="none" />
+        </svg>
         <div
           onPointerDown={handleSeekStart}
           onPointerMove={handleSeekMove}
           onPointerUp={handleSeekEnd}
           onPointerCancel={handleSeekEnd}
           onPointerLeave={handleSeekEnd}
-          className="relative h-1 bg-gray-800 rounded-full cursor-pointer group"
+          className="relative h-1.5 bg-white/15 rounded-full cursor-pointer group"
         >
           <div
-            className="absolute h-full bg-[#a4d96c] rounded-full transition-all"
+            className="absolute h-full bg-gradient-to-r from-blue-300 to-indigo-200 rounded-full transition-all"
             style={{ width: `${progress}%` }}
           />
           <div
@@ -161,20 +173,20 @@ export function NowPlayingPage() {
             style={{ left: `${progress}%`, marginLeft: '-8px' }}
           />
         </div>
-        <div className="flex justify-between text-xs text-gray-400 mt-2">
+        <div className="flex justify-between text-xs text-blue-100/70 mt-2">
           <span>{formatTime(activeTime)}</span>
           <span>-{formatTime(Math.max(duration - activeTime, 0))}</span>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="px-8 py-6">
+      <div className="px-6 sm:px-8 py-6">
         {/* Secondary Controls */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 glass-surface rounded-2xl px-4 py-3">
           <button
             onClick={withHaptic(toggleShuffle)}
             className={`p-2 rounded-full transition ${
-              shuffle ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
+              shuffle ? 'text-blue-100' : 'text-blue-100/60 hover:text-white'
             }`}
           >
             <Shuffle className="w-5 h-5" />
@@ -183,7 +195,7 @@ export function NowPlayingPage() {
           <button
             onClick={withHaptic(handleToggleFavorite)}
             className={`p-2 rounded-full transition ${
-              favorite ? 'text-red-500' : 'text-gray-400 hover:text-white'
+              favorite ? 'text-rose-400' : 'text-blue-100/60 hover:text-white'
             }`}
           >
             <Heart className={`w-6 h-6 ${favorite ? 'fill-current' : ''}`} />
@@ -192,12 +204,12 @@ export function NowPlayingPage() {
           <button
             onClick={withHaptic(toggleRepeat)}
             className={`p-2 rounded-full transition relative ${
-              repeat !== 'off' ? 'text-[#a4d96c]' : 'text-gray-400 hover:text-white'
+              repeat !== 'off' ? 'text-blue-100' : 'text-blue-100/60 hover:text-white'
             }`}
           >
             <Repeat className="w-5 h-5" />
             {repeat === 'one' && (
-              <span className="absolute top-0 right-0 w-2 h-2 bg-[#a4d96c] rounded-full" />
+              <span className="absolute top-0 right-0 w-2 h-2 bg-blue-200 rounded-full" />
             )}
           </button>
         </div>
@@ -213,12 +225,12 @@ export function NowPlayingPage() {
 
           <button
             onClick={withHaptic(playPause, 'medium')}
-            className="w-16 h-16 bg-[#a4d96c] hover:bg-[#b5e07d] active:scale-95 rounded-full flex items-center justify-center transition shadow-lg hover:scale-105"
+            className="w-16 h-16 bg-gradient-to-b from-blue-100 to-white active:scale-95 rounded-full flex items-center justify-center transition shadow-[0_0_40px_rgba(175,199,255,0.7)] hover:scale-105"
           >
             {isPlaying ? (
-              <Pause className="w-8 h-8 text-black fill-black" />
+              <Pause className="w-8 h-8 text-slate-900 fill-slate-900" />
             ) : (
-              <Play className="w-8 h-8 text-black fill-black ml-1" />
+              <Play className="w-8 h-8 text-slate-900 fill-slate-900 ml-1" />
             )}
           </button>
 
@@ -232,13 +244,13 @@ export function NowPlayingPage() {
 
         {/* Bottom Controls */}
         <div className="flex items-center justify-between mt-6">
-          <button className="p-2 text-gray-400 hover:text-white transition">
+          <button className="p-2 text-blue-100/60 hover:text-white transition">
             <Volume2 className="w-5 h-5" />
           </button>
 
           <button
             onClick={withHaptic(() => navigate('/playlists'))}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 active:scale-95 rounded-full transition-all"
+            className="pill-action flex items-center gap-2 px-4 py-2"
           >
             <ListMusic className="w-5 h-5" />
             <span className="text-sm">{queue.length} in queue</span>

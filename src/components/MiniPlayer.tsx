@@ -88,10 +88,11 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-gable-green border-t border-chathams-blue shadow-2xl z-50 safe-pad-bottom">
+    <div className="fixed bottom-3 left-0 right-0 z-50 safe-pad-bottom px-3 sm:px-4">
+      <div className="glass-surface rounded-2xl border-white/20">
       {/* Progress bar */}
       <div 
-        className="h-1 bg-chathams-blue cursor-pointer group relative"
+        className="h-1 bg-white/10 cursor-pointer group relative rounded-t-2xl"
         onPointerDown={handleSeekStart}
         onPointerMove={handleSeekMove}
         onPointerUp={handleSeekEnd}
@@ -99,7 +100,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
         onPointerLeave={handleSeekEnd}
       >
         <div 
-          className="h-full bg-calypso transition-all duration-100"
+          className="h-full bg-gradient-to-r from-blue-300 to-indigo-200 transition-all duration-100"
           style={{ width: `${progress}%` }}
         />
         <div 
@@ -108,9 +109,9 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
         />
       </div>
 
-      <div className="container mx-auto px-4 py-3">
+      <div className="container mx-auto px-3 sm:px-4 py-3">
         {(playerStatus === 'loading' || playerStatus === 'buffering' || playerStatus === 'error') && (
-          <div className="mb-2 text-xs text-timberwolf opacity-90">
+          <div className="mb-2 text-xs text-blue-100/80">
             {playerStatus === 'error'
               ? `Playback error${playerErrorCode ? ` (${playerErrorCode})` : ''}. Trying next track if available.`
               : playerStatus === 'buffering'
@@ -127,7 +128,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             <img
               src={video.thumbnails.default}
               alt={video.title}
-              className="w-14 h-14 rounded object-cover"
+              className="w-14 h-14 rounded-xl object-cover shadow-md"
             />
             <div className="min-w-0">
               {isLoadingState ? (
@@ -140,7 +141,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                   <h4 className="text-white text-sm font-semibold truncate">
                     {video.title}
                   </h4>
-                  <p className="text-timberwolf text-xs opacity-75 truncate">
+                  <p className="text-blue-100/70 text-xs truncate">
                     {video.channelTitle}
                   </p>
                 </>
@@ -152,42 +153,42 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={withHaptic(onPrevious)}
-              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all"
+              className="pill-action p-2"
               aria-label="Previous"
             >
-              <SkipBack className="w-5 h-5 text-timberwolf" />
+              <SkipBack className="w-5 h-5 text-white" />
             </button>
 
             <button
               onClick={withHaptic(onPlayPause, 'medium')}
-              className="p-3 bg-calypso hover:bg-chathams-blue active:scale-95 rounded-full transition-all transform hover:scale-105"
+              className="p-3 bg-gradient-to-b from-blue-100 to-white active:scale-95 rounded-full transition-all transform hover:scale-105 shadow-[0_0_30px_rgba(177,202,255,0.7)]"
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Pause className="w-6 h-6 text-white fill-white" />
+                <Pause className="w-6 h-6 text-slate-900 fill-slate-900" />
               ) : (
-                <Play className="w-6 h-6 text-white fill-white" />
+                <Play className="w-6 h-6 text-slate-900 fill-slate-900" />
               )}
             </button>
 
             <button
               onClick={withHaptic(onNext)}
-              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all"
+              className="pill-action p-2"
               aria-label="Next"
             >
-              <SkipForward className="w-5 h-5 text-timberwolf" />
+              <SkipForward className="w-5 h-5 text-white" />
             </button>
           </div>
 
           {/* Right: Additional Controls */}
           <div className="flex items-center gap-2 flex-1 justify-end">
-            <span className="text-timberwolf text-xs opacity-75 hidden md:block">
+            <span className="text-blue-100/70 text-xs hidden md:block">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
 
             <button
               onClick={withHaptic(onToggleFavorite)}
-              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all"
+              className="pill-action p-2"
               aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             >
               <Heart 
@@ -197,7 +198,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
             <button
               onClick={withHaptic(onToggleMute)}
-              className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all hidden md:block"
+              className="pill-action p-2 hidden md:block"
               aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted ? (
@@ -210,7 +211,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             {onExpand && (
               <button
                 onClick={withHaptic(() => navigate('/now-playing'))}
-                className="p-2 hover:bg-chathams-blue active:scale-95 rounded-full transition-all hidden md:block"
+                className="pill-action p-2 hidden md:block"
                 aria-label="Expand player"
               >
                 <Maximize2 className="w-5 h-5 text-timberwolf" />
@@ -218,6 +219,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
