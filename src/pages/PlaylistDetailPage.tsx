@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, GripVertical, Heart, Library, Play, Plus, SkipForward, Square, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, GripVertical, Heart, Library, Play, Plus, Search, SkipForward, Square, Trash2, X } from 'lucide-react';
 import { LoadingSpinner, EmptyState } from '@/components/common';
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites, usePlaylists } from '@/hooks/useStorage';
@@ -18,6 +18,7 @@ export const PlaylistDetailPage: React.FC = () => {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedVideoIds, setSelectedVideoIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [undoBulkRemove, setUndoBulkRemove] = useState<{
     playlistId: string;
     previousVideos: YouTubeVideo[];
@@ -25,6 +26,20 @@ export const PlaylistDetailPage: React.FC = () => {
   } | null>(null);
 
   const playlist = playlists.find((item) => item.id === playlistId);
+  const isFiltering = searchQuery.trim().length > 0;
+
+  const filteredVideos = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return orderedVideos;
+    }
+
+    return orderedVideos.filter((video) => {
+      const title = video.title.toLowerCase();
+      const channel = video.channelTitle.toLowerCase();
+      return title.includes(normalizedQuery) || channel.includes(normalizedQuery);
+    });
+  }, [orderedVideos, searchQuery]);
 
   useEffect(() => {
     setOrderedVideos(playlist?.videos ?? []);
@@ -104,7 +119,7 @@ export const PlaylistDetailPage: React.FC = () => {
   };
 
   const moveVideoByStep = async (videoId: string, step: -1 | 1) => {
-    if (isSelectMode) {
+    if (isSelectMode || isFiltering) {
       return;
     }
 
@@ -119,14 +134,14 @@ export const PlaylistDetailPage: React.FC = () => {
   };
 
   const handleDragStart = (videoId: string) => {
-    if (isSelectMode) {
+    if (isSelectMode || isFiltering) {
       return;
     }
     setDraggingId(videoId);
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>, videoId: string) => {
-    if (isSelectMode) {
+    if (isSelectMode || isFiltering) {
       return;
     }
     event.preventDefault();
@@ -136,7 +151,7 @@ export const PlaylistDetailPage: React.FC = () => {
   };
 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>, dropId: string) => {
-    if (isSelectMode) {
+    if (isSelectMode || isFiltering) {
       return;
     }
     event.preventDefault();
@@ -176,10 +191,17 @@ export const PlaylistDetailPage: React.FC = () => {
 
   const toggleSelectAll = () => {
     setSelectedVideoIds((prev) => {
-      if (prev.length === orderedVideos.length) {
-        return [];
+      const visibleIds = filteredVideos.map((video) => video.id);
+      const allVisibleSelected = visibleIds.every((id) => prev.includes(id));
+      if (allVisibleSelected) {
+        return prev.filter((id) => !visibleIds.includes(id));
       }
-      return orderedVideos.map((video) => video.id);
+
+      const next = new Set(prev);
+      for (const id of visibleIds) {
+        next.add(id);
+      }
+      return Array.from(next);
     });
   };
 
@@ -318,6 +340,33 @@ export const PlaylistDetailPage: React.FC = () => {
           </div>
         </div>
 
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="w-4 h-4 text-timberwolf opacity-80 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search songs in this playlist"
+              className="w-full bg-white/10 border border-white/15 rounded-xl pl-10 pr-10 py-2.5 text-white placeholder:text-timberwolf/70 outline-none focus:border-calypso"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-timberwolf hover:text-white"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          {isFiltering && (
+            <p className="text-xs text-timberwolf opacity-80 mt-2">
+              {filteredVideos.length} matching {filteredVideos.length === 1 ? 'song' : 'songs'}
+            </p>
+          )}
+        </div>
+
         {orderedVideos.length === 0 ? (
           <EmptyState
             icon={<Library className="w-16 h-16" />}
@@ -326,10 +375,12 @@ export const PlaylistDetailPage: React.FC = () => {
           />
         ) : (
           <div className="space-y-3">
-            {orderedVideos.map((video, index) => (
+            {filteredVideos.map((video) => {
+              const index = orderedVideos.findIndex((item) => item.id === video.id);
+              return (
               <div
                 key={video.id}
-                draggable
+                draggable={!isFiltering}
                 onDragStart={() => handleDragStart(video.id)}
                 onDragOver={(event) => handleDragOver(event, video.id)}
                 onDrop={(event) => {
@@ -355,7 +406,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 ) : (
                   <div className="hidden sm:flex flex-col items-center text-timberwolf opacity-70">
                     <GripVertical className="w-4 h-4" />
-                    <span className="text-[10px] uppercase tracking-wide">Drag</span>
+                    <span className="text-[10px] uppercase tracking-wide">{isFiltering ? 'View' : 'Drag'}</span>
                   </div>
                 )}
 
@@ -388,7 +439,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 <div className="flex items-center gap-1 sm:gap-2">
                   <button
                     onClick={() => void moveVideoByStep(video.id, -1)}
-                    disabled={isSelectMode || index === 0}
+                    disabled={isSelectMode || isFiltering || index === 0}
                     className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Move ${video.title} up`}
                   >
@@ -396,7 +447,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => void moveVideoByStep(video.id, 1)}
-                    disabled={isSelectMode || index === orderedVideos.length - 1}
+                    disabled={isSelectMode || isFiltering || index === orderedVideos.length - 1}
                     className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Move ${video.title} down`}
                   >
@@ -436,7 +487,8 @@ export const PlaylistDetailPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>
