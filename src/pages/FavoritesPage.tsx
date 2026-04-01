@@ -20,15 +20,15 @@ export const FavoritesPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gable-green to-black pt-20 pb-32">
+    <div className="app-page">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
-            <Heart className="w-8 h-8 text-red-500 fill-red-500" />
+            <Heart className="w-8 h-8 text-rose-400 fill-rose-400" />
             <h2 className="text-3xl font-bold text-white">Your Favorites</h2>
           </div>
-          <p className="text-timberwolf opacity-75">
+          <p className="text-blue-100/75">
             Music videos you've saved for quick access
           </p>
         </div>
@@ -45,7 +45,7 @@ export const FavoritesPage: React.FC = () => {
         ) : (
           <>
             <div className="mb-6">
-              <p className="text-timberwolf opacity-75">
+              <p className="text-blue-100/75">
                 {favorites.length} {favorites.length === 1 ? 'video' : 'videos'}
               </p>
             </div>

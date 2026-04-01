@@ -113,23 +113,23 @@ export const PlaylistsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gable-green to-black pt-20 pb-32">
+    <div className="app-page">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <Library className="w-8 h-8 text-calypso" />
+              <Library className="w-8 h-8 text-blue-200" />
               <h2 className="text-3xl font-bold text-white">Your Playlists</h2>
             </div>
-            <p className="text-timberwolf opacity-75">
+            <p className="text-blue-100/75">
               Create and organize your music collections
             </p>
           </div>
           
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-calypso hover:bg-chathams-blue text-white font-medium rounded-full transition-colors flex items-center gap-2"
+            className="pill-action px-4 py-2 font-medium flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
             Create Playlist
@@ -162,14 +162,14 @@ export const PlaylistsPage: React.FC = () => {
                 }}
                 onDragEnd={handleDragEnd}
                 onClick={() => navigate(`/playlists/${playlist.id}`)}
-                className={`bg-gable-green rounded-lg p-6 hover:bg-chathams-blue transition-colors cursor-grab active:cursor-grabbing group ${
-                  dragOverId === playlist.id ? 'ring-2 ring-calypso' : ''
+                className={`glass-surface rounded-2xl p-6 transition-colors cursor-grab active:cursor-grabbing group ${
+                  dragOverId === playlist.id ? 'ring-2 ring-blue-200/70' : ''
                 } ${draggingId === playlist.id ? 'opacity-60' : ''}`}
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Library className="w-12 h-12 text-calypso" />
-                    <div className="text-timberwolf opacity-70 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs uppercase tracking-wide">
+                    <Library className="w-12 h-12 text-blue-200" />
+                    <div className="text-blue-100/70 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs uppercase tracking-wide">
                       <GripVertical className="w-4 h-4" />
                       Drag
                     </div>
@@ -181,7 +181,7 @@ export const PlaylistsPage: React.FC = () => {
                         void movePlaylistByStep(playlist.id, -1);
                       }}
                       disabled={orderedPlaylists[0]?.id === playlist.id}
-                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-2 rounded-full transition-all hover:bg-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Move playlist up"
                     >
                       <ArrowUp className="w-4 h-4 text-white" />
@@ -192,7 +192,7 @@ export const PlaylistsPage: React.FC = () => {
                         void movePlaylistByStep(playlist.id, 1);
                       }}
                       disabled={orderedPlaylists[orderedPlaylists.length - 1]?.id === playlist.id}
-                      className="p-2 rounded-full transition-all hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-2 rounded-full transition-all hover:bg-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Move playlist down"
                     >
                       <ArrowDown className="w-4 h-4 text-white" />
@@ -202,7 +202,7 @@ export const PlaylistsPage: React.FC = () => {
                         e.stopPropagation();
                         void handleRenamePlaylist(playlist);
                       }}
-                      className="p-2 hover:bg-white/10 rounded-full transition-all"
+                      className="p-2 hover:bg-blue-500/25 rounded-full transition-all"
                       aria-label="Rename playlist"
                     >
                       <Pencil className="w-4 h-4 text-white" />
@@ -212,7 +212,7 @@ export const PlaylistsPage: React.FC = () => {
                         e.stopPropagation();
                         void handleDuplicatePlaylist(playlist.id);
                       }}
-                      className="p-2 hover:bg-white/10 rounded-full transition-all"
+                      className="p-2 hover:bg-blue-500/25 rounded-full transition-all"
                       aria-label="Duplicate playlist"
                     >
                       <Copy className="w-4 h-4 text-white" />
@@ -232,7 +232,7 @@ export const PlaylistsPage: React.FC = () => {
                 <h3 className="text-white font-semibold text-lg mb-2">
                   {playlist.name}
                 </h3>
-                <p className="text-timberwolf text-sm opacity-75">
+                <p className="text-blue-100/75 text-sm">
                   {playlist.videos.length} {playlist.videos.length === 1 ? 'video' : 'videos'}
                 </p>
               </div>
@@ -243,21 +243,21 @@ export const PlaylistsPage: React.FC = () => {
         {/* Create Playlist Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-            <div className="bg-gable-green rounded-lg p-8 max-w-md w-full border border-calypso">
+            <div className="glass-surface rounded-2xl p-8 max-w-md w-full">
               <h3 className="text-white text-2xl font-bold mb-4">Create Playlist</h3>
               <input
                 type="text"
                 value={playlistName}
                 onChange={(e) => setPlaylistName(e.target.value)}
                 placeholder="Playlist name..."
-                className="w-full bg-chathams-blue text-white px-4 py-3 rounded-lg mb-6 outline-none focus:ring-2 focus:ring-calypso"
+                className="w-full bg-white/10 text-white px-4 py-3 rounded-lg mb-6 outline-none focus:ring-2 focus:ring-blue-200/40"
                 autoFocus
                 onKeyPress={(e) => e.key === 'Enter' && handleCreatePlaylist()}
               />
               <div className="flex gap-3">
                 <button
                   onClick={handleCreatePlaylist}
-                  className="flex-1 px-4 py-2 bg-calypso hover:bg-chathams-blue text-white font-medium rounded-lg transition-colors"
+                  className="flex-1 px-4 py-2 pill-action font-medium"
                 >
                   Create
                 </button>
@@ -266,7 +266,7 @@ export const PlaylistsPage: React.FC = () => {
                     setShowCreateModal(false);
                     setPlaylistName('');
                   }}
-                  className="flex-1 px-4 py-2 bg-transparent border border-timberwolf text-timberwolf hover:bg-chathams-blue hover:border-calypso font-medium rounded-lg transition-colors"
+                  className="flex-1 px-4 py-2 bg-transparent border border-blue-100/35 text-blue-100/85 hover:bg-blue-500/20 font-medium rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

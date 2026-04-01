@@ -29,12 +29,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <form 
       onSubmit={handleSubmit}
-      className={`relative flex items-center bg-gable-green border-2 rounded-full overflow-hidden transition-all duration-300 ${
-        isFocused ? 'border-calypso shadow-lg' : 'border-transparent'
+      className={`relative flex items-center glass-surface rounded-full overflow-hidden transition-all duration-300 ${
+        isFocused ? 'border-blue-200/60 shadow-[0_0_0_4px_rgba(118,153,255,0.16)]' : ''
       }`}
     >
       <div className="pl-4 pr-2">
-        <SearchIcon className="w-5 h-5 text-timberwolf opacity-60" />
+        <SearchIcon className="w-5 h-5 text-blue-100/70" />
       </div>
       
       <input
@@ -45,7 +45,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder={placeholder}
-        className="flex-1 bg-transparent text-white placeholder-timberwolf placeholder-opacity-50 py-3 pr-4 outline-none text-sm"
+        className="flex-1 bg-transparent text-white placeholder-blue-100/50 py-3 pr-4 outline-none text-sm"
       />
 
       {query && (
@@ -55,7 +55,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           className="pr-4 hover:opacity-75 transition-opacity"
           aria-label="Clear search"
         >
-          <X className="w-5 h-5 text-timberwolf opacity-60" />
+          <X className="w-5 h-5 text-blue-100/70" />
         </button>
       )}
     </form>

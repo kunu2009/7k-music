@@ -99,15 +99,15 @@ export const SearchPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gable-green to-black pt-20 pb-32">
+    <div className="app-page">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
-            <SearchIcon className="w-8 h-8 text-calypso" />
+            <SearchIcon className="w-8 h-8 text-blue-200" />
             <h2 className="text-3xl font-bold text-white">Search Music</h2>
           </div>
-          <p className="text-timberwolf opacity-75 mb-6">
+          <p className="text-blue-100/75 mb-6">
             Find your favorite music videos from YouTube
           </p>
           
@@ -129,7 +129,7 @@ export const SearchPage: React.FC = () => {
         ) : error && searchResults.length > 0 ? (
           <>
             <div className="mb-6">
-              <p className="text-timberwolf opacity-75">{error}</p>
+              <p className="text-blue-100/75">{error}</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {searchResults.map((video) => (
@@ -153,7 +153,7 @@ export const SearchPage: React.FC = () => {
         ) : (
           <>
             <div className="mb-6">
-              <p className="text-timberwolf opacity-75">
+              <p className="text-blue-100/75">
                 Found {searchResults.length} results
               </p>
             </div>

@@ -17,9 +17,9 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-12">
-      <div className={`${sizeClasses[size]} border-4 border-chathams-blue border-t-calypso rounded-full animate-spin`} />
+      <div className={`${sizeClasses[size]} border-4 border-blue-200/20 border-t-blue-100 rounded-full animate-spin`} />
       {text && (
-        <p className="text-timberwolf text-sm opacity-75">{text}</p>
+        <p className="text-blue-100/75 text-sm">{text}</p>
       )}
     </div>
   );
@@ -42,20 +42,20 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   action,
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 px-4 text-center">
+    <div className="glass-surface rounded-3xl flex flex-col items-center justify-center gap-4 py-16 px-4 text-center">
       {icon && (
-        <div className="text-timberwolf opacity-40">
+        <div className="text-blue-100/45">
           {icon}
         </div>
       )}
       <h3 className="text-white text-xl font-semibold">{title}</h3>
       {description && (
-        <p className="text-timberwolf opacity-75 max-w-md">{description}</p>
+        <p className="text-blue-100/75 max-w-md">{description}</p>
       )}
       {action && (
         <button
           onClick={action.onClick}
-          className="mt-4 px-6 py-3 bg-calypso hover:bg-chathams-blue text-white font-medium rounded-full transition-colors"
+          className="mt-4 px-6 py-3 pill-action font-medium"
         >
           {action.label}
         </button>
@@ -72,12 +72,12 @@ export const VideoGridSkeleton: React.FC<VideoGridSkeletonProps> = ({ count = 8 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="bg-gable-green rounded-lg overflow-hidden animate-pulse">
-          <div className="aspect-video bg-chathams-blue" />
+        <div key={index} className="glass-surface rounded-2xl overflow-hidden animate-pulse">
+          <div className="aspect-video bg-blue-200/10" />
           <div className="p-4 space-y-3">
-            <div className="h-4 bg-chathams-blue rounded w-full" />
-            <div className="h-4 bg-chathams-blue rounded w-3/4" />
-            <div className="h-3 bg-chathams-blue rounded w-2/3" />
+            <div className="h-4 bg-blue-200/10 rounded w-full" />
+            <div className="h-4 bg-blue-200/10 rounded w-3/4" />
+            <div className="h-3 bg-blue-200/10 rounded w-2/3" />
           </div>
         </div>
       ))}

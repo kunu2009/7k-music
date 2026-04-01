@@ -239,7 +239,7 @@ export const PlaylistDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gable-green to-black pt-20 pb-32">
+      <div className="app-page">
         <div className="container mx-auto px-4">
           <LoadingSpinner size="lg" text="Loading playlist..." />
         </div>
@@ -249,11 +249,11 @@ export const PlaylistDetailPage: React.FC = () => {
 
   if (!playlist) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gable-green to-black pt-20 pb-32">
+      <div className="app-page">
         <div className="container mx-auto px-4">
           <button
             onClick={() => navigate('/playlists')}
-            className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
+            className="mb-6 inline-flex items-center gap-2 px-4 py-2 pill-action"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Playlists
@@ -273,11 +273,11 @@ export const PlaylistDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gable-green to-black pt-20 pb-32">
+    <div className="app-page">
       <div className="container mx-auto px-4">
         <button
           onClick={() => navigate('/playlists')}
-          className="mb-6 inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
+          className="mb-6 inline-flex items-center gap-2 px-4 py-2 pill-action"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Playlists
@@ -286,7 +286,7 @@ export const PlaylistDetailPage: React.FC = () => {
         <div className="mb-8 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">{playlist.name}</h2>
-            <p className="text-timberwolf opacity-75">
+            <p className="text-blue-100/75">
               {orderedVideos.length} {orderedVideos.length === 1 ? 'video' : 'videos'}
             </p>
           </div>
@@ -297,7 +297,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 <button
                   onClick={() => setIsSelectMode(true)}
                   disabled={orderedVideos.length === 0}
-                  className="px-4 py-3 bg-white/10 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full transition-colors inline-flex items-center gap-2"
+                  className="px-4 py-3 pill-action disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                 >
                   <Square className="w-4 h-4" />
                   Select
@@ -305,7 +305,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 <button
                   onClick={handlePlayAll}
                   disabled={orderedVideos.length === 0}
-                  className="px-5 py-3 bg-calypso hover:bg-chathams-blue disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-full transition-colors inline-flex items-center gap-2"
+                  className="px-5 py-3 pill-action disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                 >
                   <Play className="w-4 h-4 fill-white" />
                   Play All
@@ -315,7 +315,7 @@ export const PlaylistDetailPage: React.FC = () => {
               <>
                 <button
                   onClick={toggleSelectAll}
-                  className="px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors inline-flex items-center gap-2"
+                  className="px-4 py-3 pill-action inline-flex items-center gap-2"
                 >
                   {selectedVideoIds.length === orderedVideos.length ? <Check className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                   {selectedVideoIds.length === orderedVideos.length ? 'Clear All' : 'Select All'}
@@ -330,7 +330,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setIsSelectMode(false)}
-                  className="px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors inline-flex items-center gap-2"
+                  className="px-4 py-3 pill-action inline-flex items-center gap-2"
                 >
                   <X className="w-4 h-4" />
                   Cancel
@@ -348,12 +348,12 @@ export const PlaylistDetailPage: React.FC = () => {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search songs in this playlist"
-              className="w-full bg-white/10 border border-white/15 rounded-xl pl-10 pr-10 py-2.5 text-white placeholder:text-timberwolf/70 outline-none focus:border-calypso"
+              className="w-full bg-white/10 border border-blue-100/20 rounded-xl pl-10 pr-10 py-2.5 text-white placeholder:text-blue-100/60 outline-none focus:border-blue-200/60"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-timberwolf hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-100/70 hover:text-white"
                 aria-label="Clear search"
               >
                 <X className="w-4 h-4" />
@@ -361,7 +361,7 @@ export const PlaylistDetailPage: React.FC = () => {
             )}
           </div>
           {isFiltering && (
-            <p className="text-xs text-timberwolf opacity-80 mt-2">
+            <p className="text-xs text-blue-100/80 mt-2">
               {filteredVideos.length} matching {filteredVideos.length === 1 ? 'song' : 'songs'}
             </p>
           )}
@@ -388,7 +388,7 @@ export const PlaylistDetailPage: React.FC = () => {
                 }}
                 onDragEnd={handleDragEnd}
                 className={`bg-gable-green/90 border border-white/5 rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all ${
-                  dragOverId === video.id ? 'ring-2 ring-calypso' : ''
+                  dragOverId === video.id ? 'ring-2 ring-blue-200/70' : ''
                 } ${draggingId === video.id ? 'opacity-60' : ''} ${selectedVideoIds.includes(video.id) ? 'ring-2 ring-white/70' : ''}`}
               >
                 {isSelectMode ? (
@@ -404,7 +404,7 @@ export const PlaylistDetailPage: React.FC = () => {
                     )}
                   </button>
                 ) : (
-                  <div className="hidden sm:flex flex-col items-center text-timberwolf opacity-70">
+                  <div className="hidden sm:flex flex-col items-center text-blue-100/70">
                     <GripVertical className="w-4 h-4" />
                     <span className="text-[10px] uppercase tracking-wide">{isFiltering ? 'View' : 'Drag'}</span>
                   </div>
@@ -430,8 +430,8 @@ export const PlaylistDetailPage: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-timberwolf opacity-70 mb-1">#{index + 1}</p>
                   <h3 className="text-white font-semibold line-clamp-2">{video.title}</h3>
-                  <p className="text-sm text-timberwolf opacity-80 truncate">{video.channelTitle}</p>
-                  <p className="text-xs text-timberwolf opacity-60 mt-1">
+                  <p className="text-sm text-blue-100/80 truncate">{video.channelTitle}</p>
+                  <p className="text-xs text-blue-100/60 mt-1">
                     {video.duration ? youtubeApi.formatDuration(video.duration) : 'Live/Unknown'}
                   </p>
                 </div>

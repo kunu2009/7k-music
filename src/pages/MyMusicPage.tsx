@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, ChevronLeft, MoreVertical } from 'lucide-react';
+import { ChevronLeft, Download, Heart, Library, MoreVertical, Play, Sparkles } from 'lucide-react';
 import { usePlaylists } from '@/hooks/useStorage';
 import { YouTubeVideo } from '@/types';
 import { usePlayer } from '@/context/PlayerContext';
@@ -25,18 +25,18 @@ export function MyMusicPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white pb-32">
+    <div className="app-page text-white pb-32">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-black/80 backdrop-blur-lg border-b border-gray-800">
+      <div className="sticky top-0 z-10 glass-surface rounded-b-3xl border-none">
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white/10 rounded-full transition"
+            className="pill-action p-2"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <h1 className="text-xl font-bold">My Music</h1>
-          <button className="p-2 hover:bg-white/10 rounded-full transition">
+          <button className="pill-action p-2">
             <MoreVertical className="w-6 h-6" />
           </button>
         </div>
@@ -49,8 +49,8 @@ export function MyMusicPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 rounded-full whitespace-nowrap transition ${
                 activeTab === tab.id
-                  ? 'bg-[#a4d96c] text-black font-semibold'
-                  : 'bg-gray-800/50 text-gray-300 hover:bg-gray-800'
+                  ? 'bg-blue-100 text-slate-900 font-semibold'
+                  : 'bg-blue-900/35 text-blue-100/80 hover:bg-blue-900/55'
               }`}
             >
               {tab.label}
@@ -68,7 +68,7 @@ export function MyMusicPage() {
                 <p className="text-gray-400 mb-4">No playlists yet</p>
                 <button
                   onClick={() => navigate('/playlists')}
-                  className="px-6 py-3 bg-[#17557b] hover:bg-[#366e8d] rounded-full transition"
+                  className="px-6 py-3 pill-action"
                 >
                   Create Playlist
                 </button>
@@ -77,7 +77,7 @@ export function MyMusicPage() {
               playlists.map((playlist) => (
                 <div
                   key={playlist.id}
-                  className="bg-gradient-to-r from-gray-800/50 to-transparent rounded-2xl p-4 hover:from-gray-800 transition group"
+                  className="glass-surface rounded-2xl p-4 transition group"
                 >
                   <div className="flex items-center gap-4">
                     {/* Playlist Cover */}
@@ -97,9 +97,9 @@ export function MyMusicPage() {
                       </div>
                       <button
                         onClick={() => handlePlayPlaylist(playlist.videos)}
-                        className="absolute -bottom-1 -right-1 w-10 h-10 bg-[#a4d96c] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-lg hover:scale-110"
+                        className="absolute -bottom-1 -right-1 w-10 h-10 bg-gradient-to-b from-blue-100 to-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-lg hover:scale-110"
                       >
-                        <Play className="w-5 h-5 text-black fill-black" />
+                        <Play className="w-5 h-5 text-slate-900 fill-slate-900" />
                       </button>
                     </div>
 
@@ -114,7 +114,7 @@ export function MyMusicPage() {
                     {/* Play Button */}
                     <button
                       onClick={() => handlePlayPlaylist(playlist.videos)}
-                      className="w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition"
+                      className="w-12 h-12 pill-action flex items-center justify-center"
                     >
                       <Play className="w-5 h-5" />
                     </button>
@@ -131,16 +131,16 @@ export function MyMusicPage() {
             <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
               <button
                 onClick={() => navigate('/favorites')}
-                className="p-6 bg-gradient-to-br from-red-500/20 to-pink-500/20 rounded-2xl hover:from-red-500/30 hover:to-pink-500/30 transition"
+                className="p-6 glass-surface rounded-2xl hover:bg-blue-900/35 transition"
               >
-                <div className="text-4xl mb-2">❤️</div>
+                <Heart className="w-8 h-8 mb-3 text-rose-400 mx-auto" />
                 <div className="font-semibold">Favorites</div>
               </button>
               <button
                 onClick={() => setActiveTab('playlists')}
-                className="p-6 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl hover:from-blue-500/30 hover:to-purple-500/30 transition"
+                className="p-6 glass-surface rounded-2xl hover:bg-blue-900/35 transition"
               >
-                <div className="text-4xl mb-2">🎵</div>
+                <Library className="w-8 h-8 mb-3 text-blue-200 mx-auto" />
                 <div className="font-semibold">Playlists</div>
               </button>
             </div>
@@ -152,7 +152,7 @@ export function MyMusicPage() {
             <p className="text-gray-400 mb-4">Your liked songs appear here</p>
             <button
               onClick={() => navigate('/favorites')}
-              className="px-6 py-3 bg-[#17557b] hover:bg-[#366e8d] rounded-full transition"
+              className="px-6 py-3 pill-action"
             >
               View Favorites
             </button>
@@ -161,8 +161,19 @@ export function MyMusicPage() {
 
         {activeTab === 'downloaded' && (
           <div className="text-center py-12">
+            <Download className="w-10 h-10 text-blue-200/70 mx-auto mb-3" />
             <p className="text-gray-400 mb-4">Downloaded songs for offline playback</p>
             <p className="text-sm text-gray-500">Feature coming soon</p>
+          </div>
+        )}
+
+        {activeTab === 'all' && (
+          <div className="mt-10 glass-surface rounded-2xl p-5 max-w-md mx-auto">
+            <div className="flex items-center gap-2 text-blue-100">
+              <Sparkles className="w-5 h-5" />
+              <p className="font-semibold">Curated for you</p>
+            </div>
+            <p className="text-blue-100/75 text-sm mt-2">We will soon add AI-powered daily mixes and listening streak insights.</p>
           </div>
         )}
       </div>
