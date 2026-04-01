@@ -19,7 +19,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   onAddToPlaylist,
 }) => {
   return (
-    <div className="group relative glass-surface rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer hover:-translate-y-1">
+    <div className="group relative glass-surface rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer motion-fade-up interactive-lift">
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden">
         <img

@@ -36,9 +36,9 @@ export const Navigation: React.FC = () => {
                 key={to}
                 to={to}
                 className={({ isActive }) =>
-                  `flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-200 whitespace-nowrap ${
+                  `flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all duration-200 whitespace-nowrap interactive-lift ${
                     isActive
-                      ? 'bg-blue-500/70 text-white shadow-lg shadow-blue-900/40'
+                      ? 'bg-blue-500/70 text-white shadow-lg shadow-blue-900/40 motion-glow'
                       : 'text-blue-100/80 hover:bg-blue-500/25 hover:text-white'
                   }`
                 }

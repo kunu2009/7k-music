@@ -387,7 +387,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   void handleDrop(event, video.id);
                 }}
                 onDragEnd={handleDragEnd}
-                className={`bg-gable-green/90 border border-white/5 rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all ${
+                className={`bg-gable-green/90 border border-white/5 rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 transition-all motion-fade-up interactive-lift ${
                   dragOverId === video.id ? 'ring-2 ring-blue-200/70' : ''
                 } ${draggingId === video.id ? 'opacity-60' : ''} ${selectedVideoIds.includes(video.id) ? 'ring-2 ring-white/70' : ''}`}
               >
@@ -440,7 +440,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   <button
                     onClick={() => void moveVideoByStep(video.id, -1)}
                     disabled={isSelectMode || isFiltering || index === 0}
-                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Move ${video.title} up`}
                   >
                     <ArrowUp className="w-4 h-4 text-white" />
@@ -448,7 +448,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   <button
                     onClick={() => void moveVideoByStep(video.id, 1)}
                     disabled={isSelectMode || isFiltering || index === orderedVideos.length - 1}
-                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Move ${video.title} down`}
                   >
                     <ArrowDown className="w-4 h-4 text-white" />
@@ -456,7 +456,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   <button
                     onClick={() => void handleToggleFavorite(video)}
                     disabled={isSelectMode}
-                    className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-95"
                     aria-label={isFavorite(video.id) ? 'Remove from favorites' : 'Add to favorites'}
                   >
                     <Heart className={`w-4 h-4 ${isFavorite(video.id) ? 'text-red-500 fill-red-500' : 'text-white'}`} />
@@ -464,7 +464,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   <button
                     onClick={() => void handleRemoveVideo(video.id)}
                     disabled={isSelectMode}
-                    className="p-2 rounded-full hover:bg-red-500/80 transition-colors"
+                    className="p-2 rounded-full hover:bg-red-500/80 transition-colors active:scale-95"
                     aria-label={`Remove ${video.title} from playlist`}
                   >
                     <Trash2 className="w-4 h-4 text-white" />
@@ -472,7 +472,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   <button
                     onClick={() => handlePlayNext(video)}
                     disabled={isSelectMode}
-                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Play ${video.title} next`}
                   >
                     <SkipForward className="w-4 h-4 text-white" />
@@ -480,7 +480,7 @@ export const PlaylistDetailPage: React.FC = () => {
                   <button
                     onClick={() => handleAddToQueue(video)}
                     disabled={isSelectMode}
-                    className="p-2 rounded-full hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="p-2 rounded-full hover:bg-white/10 transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label={`Add ${video.title} to queue`}
                   >
                     <Plus className="w-4 h-4 text-white" />

@@ -77,7 +77,7 @@ export function MyMusicPage() {
               playlists.map((playlist) => (
                 <div
                   key={playlist.id}
-                  className="glass-surface rounded-2xl p-4 transition group"
+                  className="glass-surface rounded-2xl p-4 transition group motion-fade-up interactive-lift"
                 >
                   <div className="flex items-center gap-4">
                     {/* Playlist Cover */}

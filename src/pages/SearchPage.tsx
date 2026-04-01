@@ -102,7 +102,7 @@ export const SearchPage: React.FC = () => {
     <div className="app-page">
       <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 motion-fade-up">
           <div className="flex items-center gap-3 mb-3">
             <SearchIcon className="w-8 h-8 text-blue-200" />
             <h2 className="text-3xl font-bold text-white">Search Music</h2>

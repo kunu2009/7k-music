@@ -162,7 +162,7 @@ export const PlaylistsPage: React.FC = () => {
                 }}
                 onDragEnd={handleDragEnd}
                 onClick={() => navigate(`/playlists/${playlist.id}`)}
-                className={`glass-surface rounded-2xl p-6 transition-colors cursor-grab active:cursor-grabbing group ${
+                className={`glass-surface rounded-2xl p-6 transition-colors cursor-grab active:cursor-grabbing group motion-fade-up interactive-lift ${
                   dragOverId === playlist.id ? 'ring-2 ring-blue-200/70' : ''
                 } ${draggingId === playlist.id ? 'opacity-60' : ''}`}
               >

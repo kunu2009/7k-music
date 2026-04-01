@@ -107,7 +107,7 @@ export function CategoriesPage() {
               <button
                 key={category.id}
                 onClick={() => handleCategoryClick(category.query, category.id)}
-                className="group relative aspect-square rounded-2xl overflow-hidden glass-surface transition-all duration-300 transform hover:scale-105"
+                className="group relative aspect-square rounded-2xl overflow-hidden glass-surface transition-all duration-300 transform hover:scale-105 motion-fade-up interactive-lift"
               >
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition" />
                 <div className="relative h-full flex flex-col items-center justify-center p-4">

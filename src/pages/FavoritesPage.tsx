@@ -23,7 +23,7 @@ export const FavoritesPage: React.FC = () => {
     <div className="app-page">
       <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 motion-fade-up">
           <div className="flex items-center gap-3 mb-3">
             <Heart className="w-8 h-8 text-rose-400 fill-rose-400" />
             <h2 className="text-3xl font-bold text-white">Your Favorites</h2>
@@ -44,7 +44,7 @@ export const FavoritesPage: React.FC = () => {
           />
         ) : (
           <>
-            <div className="mb-6">
+            <div className="mb-6 motion-fade-up">
               <p className="text-blue-100/75">
                 {favorites.length} {favorites.length === 1 ? 'video' : 'videos'}
               </p>
