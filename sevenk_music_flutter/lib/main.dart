@@ -154,7 +154,6 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   int _trackIndex = 0;
   List<DemoTrack> _queue = List.of(allTracks);
   String? _activePlaylistId;
-  String? _libraryDetailPlaylistId;
   String _discoverQuery = '';
   final Set<String> _downloadedTrackIds = <String>{};
   final Map<String, List<DemoTrack>> _playlistTracks = {
@@ -165,7 +164,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _shuffleEnabled = false;
   bool _loadingSource = true;
   bool _lyricsExpanded = true;
-  String _discoverQuery = '';
+  
 
   @override
   void initState() {
@@ -229,6 +228,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   DemoTrack get _currentTrack => _queue[_trackIndex.clamp(0, _queue.length - 1)];
 
+  List<DemoTrack> _tracksForPlaylist(DemoPlaylist playlist) {
+    return _playlistTracks[playlist.id] ?? playlist.tracks;
+  }
+
   List<DemoTrack> get _downloadedTracks {
     return allTracks.where((track) => _downloadedTrackIds.contains(track.id)).toList();
   }
@@ -240,9 +243,12 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _playFromPlaylist(DemoPlaylist playlist, int index) async {
-    final selected = playlist.tracks[index];
+    final tracks = _tracksForPlaylist(playlist);
+    if (tracks.isEmpty) return;
+    final safeIndex = index.clamp(0, tracks.length - 1);
+    final selected = tracks[safeIndex];
     _activePlaylistId = playlist.id;
-    _queue = List<DemoTrack>.of(playlist.tracks);
+    _queue = List<DemoTrack>.of(tracks);
     final initialIndex = _queue.indexWhere((track) => track.id == selected.id);
     await _loadQueue(initialIndex: initialIndex < 0 ? 0 : initialIndex, autoPlay: true);
   }
@@ -424,27 +430,44 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         const SizedBox(height: 18),
         _heroCard(),
         const SizedBox(height: 16),
-        TextField(
-          onChanged: (value) => setState(() => _discoverQuery = value),
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Search songs or artists',
-            hintStyle: const TextStyle(color: Color(0xFF9DB0D8)),
-            prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFC8D6F6)),
-            filled: true,
-            fillColor: const Color(0x261A2B54),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0x2FAFC2FF)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0x7FAFD0FF)),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: const Color(0x261A2B54),
+            border: Border.all(color: const Color(0x2FAFC2FF)),
+          ),
+          child: TextField(
+            controller: _discoverSearchController,
+            onChanged: (value) => setState(() => _discoverQuery = value),
+            style: const TextStyle(color: Color(0xFFE6EEFF)),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFC3D2F5)),
+              suffixIcon: _discoverQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: () {
+                        _discoverSearchController.clear();
+                        setState(() => _discoverQuery = '');
+                      },
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFFC3D2F5)),
+                    ),
+              hintText: 'Search songs or artists',
+              hintStyle: const TextStyle(color: Color(0xFF93A6D1)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
         ),
-        const SizedBox(height: 26),
-        Text('Featured Playlists', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 22),
+        if (_discoverQuery.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '${filteredTracks.length} results for "${_discoverQuery.trim()}"',
+              style: const TextStyle(color: Color(0xFFB7C7EB), fontSize: 12),
+            ),
+          ),
+        Text('Trending Playlists', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         ...demoPlaylists.map((playlist) {
           final art = playlist.tracks.first.artUrl;
@@ -477,18 +500,33 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               'No songs match your search yet.',
               style: TextStyle(color: Color(0xFFB7C7EB)),
             ),
-          ),
-        ...filteredTracks.asMap().entries.map(
-              (entry) => _trackRow(
-                track: entry.value,
-                index: _queue.indexWhere((item) => item.id == entry.value.id).clamp(0, _queue.length - 1),
-                trailing: IconButton(
-                  onPressed: () => _addToQueueNext(entry.value),
-                  icon: const Icon(Icons.queue_play_next_rounded, color: Color(0xFFC3D2F5)),
+          )
+        else
+          ...filteredTracks.asMap().entries.map(
+                (entry) => _trackRow(
+                  track: entry.value,
+                  index: _queue.indexWhere((item) => item.id == entry.value.id).clamp(0, _queue.length - 1),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () => _addToQueueNext(entry.value),
+                        icon: const Icon(Icons.queue_music_rounded, color: Color(0xFFC3D2F5)),
+                      ),
+                      IconButton(
+                        onPressed: () => _toggleOffline(entry.value),
+                        icon: Icon(
+                          _downloadedTrackIds.contains(entry.value.id)
+                              ? Icons.download_done_rounded
+                              : Icons.download_for_offline_outlined,
+                          color: const Color(0xFFC3D2F5),
+                        ),
+                      ),
+                    ],
+                  ),
+                  subtitleSuffix: _downloadedTrackIds.contains(entry.value.id) ? 'Offline' : null,
                 ),
-                subtitleSuffix: _downloadedTrackIds.contains(entry.value.id) ? ' • Offline' : null,
               ),
-            ),
       ],
     );
   }
@@ -947,6 +985,136 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+}
+
+class _PlaylistDetailResult {
+  const _PlaylistDetailResult({required this.tracks, required this.startIndex});
+
+  final List<DemoTrack> tracks;
+  final int startIndex;
+}
+
+class PlaylistDetailScreen extends StatefulWidget {
+  const PlaylistDetailScreen({super.key, required this.playlist});
+
+  final DemoPlaylist playlist;
+
+  @override
+  State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
+}
+
+class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
+  late List<DemoTrack> _tracks;
+
+  @override
+  void initState() {
+    super.initState();
+    _tracks = List<DemoTrack>.of(widget.playlist.tracks);
+  }
+
+  void _reorderTracks(int oldIndex, int newIndex) {
+    setState(() {
+      if (oldIndex < newIndex) {
+        newIndex -= 1;
+      }
+      final moved = _tracks.removeAt(oldIndex);
+      _tracks.insert(newIndex, moved);
+    });
+  }
+
+  void _playTrack(BuildContext context, int index) {
+    Navigator.of(context).pop(
+      _PlaylistDetailResult(tracks: _tracks, startIndex: index),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A1026),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                ),
+                Text(widget.playlist.name, style: GoogleFonts.sora(fontSize: 24, fontWeight: FontWeight.w700)),
+                const SizedBox(width: 48),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(widget.playlist.description, style: const TextStyle(color: Color(0xFFB7C7EB))),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _playTrack(context, 0),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Play All'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _playTrack(context, 0),
+                  icon: const Icon(Icons.shuffle_rounded),
+                  label: const Text('Shuffle Play'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Text('Tracks', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _tracks.length,
+              onReorder: _reorderTracks,
+              itemBuilder: (context, index) {
+                final track = _tracks[index];
+                return Container(
+                  key: ValueKey(track.id),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: const Color(0x261A2B54),
+                    border: Border.all(color: const Color(0x2FAFC2FF)),
+                  ),
+                  child: ListTile(
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(track.artUrl, width: 54, height: 54, fit: BoxFit.cover),
+                    ),
+                    title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(track.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => _playTrack(context, index),
+                          icon: const Icon(Icons.play_arrow_rounded),
+                        ),
+                        ReorderableDragStartListener(
+                          index: index,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Icon(Icons.drag_indicator_rounded, color: Color(0xFFC3D2F5)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
