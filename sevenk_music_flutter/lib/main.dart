@@ -148,17 +148,24 @@ class SevenKMusicShell extends StatefulWidget {
 
 class _SevenKMusicShellState extends State<SevenKMusicShell> {
   late final AudioPlayer _player;
+  final TextEditingController _discoverSearchController = TextEditingController();
 
   int _currentTab = 0;
   int _trackIndex = 0;
   List<DemoTrack> _queue = List.of(allTracks);
   String? _activePlaylistId;
+  String? _libraryDetailPlaylistId;
+  String _discoverQuery = '';
   final Set<String> _downloadedTrackIds = <String>{};
+  final Map<String, List<DemoTrack>> _playlistTracks = {
+    for (final playlist in demoPlaylists) playlist.id: List<DemoTrack>.of(playlist.tracks),
+  };
 
   LoopMode _loopMode = LoopMode.off;
   bool _shuffleEnabled = false;
   bool _loadingSource = true;
   bool _lyricsExpanded = true;
+  String _discoverQuery = '';
 
   @override
   void initState() {
@@ -238,6 +245,22 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _queue = List<DemoTrack>.of(playlist.tracks);
     final initialIndex = _queue.indexWhere((track) => track.id == selected.id);
     await _loadQueue(initialIndex: initialIndex < 0 ? 0 : initialIndex, autoPlay: true);
+  }
+
+  Future<void> _openPlaylistDetail(DemoPlaylist playlist) async {
+    final result = await Navigator.of(context).push<_PlaylistDetailResult>(
+      MaterialPageRoute(
+        builder: (_) => PlaylistDetailScreen(playlist: playlist),
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    _activePlaylistId = playlist.id;
+    _queue = List<DemoTrack>.of(result.tracks);
+    await _loadQueue(initialIndex: result.startIndex, autoPlay: true);
   }
 
   Future<void> _toggleRepeatMode() async {
@@ -381,6 +404,17 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Widget _buildDiscoverPage() {
+    final normalized = _discoverQuery.trim().toLowerCase();
+    final filteredTracks = normalized.isEmpty
+        ? allTracks
+        : allTracks
+            .where(
+              (track) =>
+                  track.title.toLowerCase().contains(normalized) ||
+                  track.artist.toLowerCase().contains(normalized),
+            )
+            .toList();
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
       children: [
@@ -389,6 +423,26 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         const Text('Curated for your daily listening sessions', style: TextStyle(color: Color(0xFFB7C7EB))),
         const SizedBox(height: 18),
         _heroCard(),
+        const SizedBox(height: 16),
+        TextField(
+          onChanged: (value) => setState(() => _discoverQuery = value),
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Search songs or artists',
+            hintStyle: const TextStyle(color: Color(0xFF9DB0D8)),
+            prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFC8D6F6)),
+            filled: true,
+            fillColor: const Color(0x261A2B54),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0x2FAFC2FF)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: Color(0x7FAFD0FF)),
+            ),
+          ),
+        ),
         const SizedBox(height: 26),
         Text('Featured Playlists', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
@@ -409,19 +463,22 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text(playlist.description, maxLines: 1, overflow: TextOverflow.ellipsis),
               trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-              onTap: () {
-                setState(() {
-                  _currentTab = 1;
-                  _activePlaylistId = playlist.id;
-                });
-              },
+              onTap: () => _openPlaylistDetail(playlist),
             ),
           );
         }),
         const SizedBox(height: 26),
         Text('Top Songs', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 14),
-        ...allTracks.asMap().entries.map(
+        if (filteredTracks.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Text(
+              'No songs match your search yet.',
+              style: TextStyle(color: Color(0xFFB7C7EB)),
+            ),
+          ),
+        ...filteredTracks.asMap().entries.map(
               (entry) => _trackRow(
                 track: entry.value,
                 index: _queue.indexWhere((item) => item.id == entry.value.id).clamp(0, _queue.length - 1),
@@ -472,7 +529,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               border: Border.all(color: selected ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF)),
             ),
             child: ListTile(
-              onTap: () => setState(() => _activePlaylistId = playlist.id),
+              onTap: () => _openPlaylistDetail(playlist),
               title: Text(playlist.name),
               subtitle: Text('${playlist.tracks.length} tracks • ${playlist.description}'),
               trailing: IconButton(
