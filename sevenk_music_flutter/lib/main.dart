@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -150,11 +151,18 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   late final AudioPlayer _player;
   final TextEditingController _discoverSearchController = TextEditingController();
 
+  static const String _prefsCurrentTabKey = 'sevenk.currentTab.v1';
+  static const String _prefsActivePlaylistKey = 'sevenk.activePlaylist.v1';
+  static const String _prefsQueueOrderKey = 'sevenk.queueOrder.v1';
+  static const String _prefsRecentSearchesKey = 'sevenk.recentSearches.v1';
+  static const String _prefsDownloadedTracksKey = 'sevenk.downloadedTrackIds.v1';
+
   int _currentTab = 0;
   int _trackIndex = 0;
   List<DemoTrack> _queue = List.of(allTracks);
   String? _activePlaylistId;
   String _discoverQuery = '';
+  final List<String> _recentDiscoverSearches = <String>[];
   final Set<String> _downloadedTrackIds = <String>{};
   final Map<String, List<DemoTrack>> _playlistTracks = {
     for (final playlist in demoPlaylists) playlist.id: List<DemoTrack>.of(playlist.tracks),
@@ -164,6 +172,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _shuffleEnabled = false;
   bool _loadingSource = true;
   bool _lyricsExpanded = true;
+  SharedPreferences? _prefs;
   
 
   @override
@@ -176,6 +185,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   Future<void> _init() async {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
+
+    _prefs = await SharedPreferences.getInstance();
+    await _restoreUiState();
 
     await _loadQueue(initialIndex: 0, autoPlay: false);
     _player.currentIndexStream.listen((index) {
@@ -228,6 +240,67 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   DemoTrack get _currentTrack => _queue[_trackIndex.clamp(0, _queue.length - 1)];
 
+  DemoTrack? _trackFromId(String id) {
+    for (final track in allTracks) {
+      if (track.id == id) return track;
+    }
+    return null;
+  }
+
+  Future<void> _restoreUiState() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    setState(() {
+      _currentTab = prefs.getInt(_prefsCurrentTabKey) ?? 0;
+
+      final recentSearches = prefs.getStringList(_prefsRecentSearchesKey) ?? const <String>[];
+      _recentDiscoverSearches
+        ..clear()
+        ..addAll(recentSearches);
+
+      final downloadedIds = prefs.getStringList(_prefsDownloadedTracksKey) ?? const <String>[];
+      _downloadedTrackIds
+        ..clear()
+        ..addAll(downloadedIds);
+
+      _activePlaylistId = prefs.getString(_prefsActivePlaylistKey);
+
+      final queueIds = prefs.getStringList(_prefsQueueOrderKey);
+      if (queueIds != null && queueIds.isNotEmpty) {
+        final restoredQueue = <DemoTrack>[];
+        for (final id in queueIds) {
+          final track = _trackFromId(id);
+          if (track != null) {
+            restoredQueue.add(track);
+          }
+        }
+        if (restoredQueue.isNotEmpty) {
+          _queue = restoredQueue;
+        }
+      }
+
+      if (_queue.isEmpty) {
+        _queue = List<DemoTrack>.of(allTracks);
+      }
+    });
+  }
+
+  Future<void> _persistUiState() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    await prefs.setInt(_prefsCurrentTabKey, _currentTab);
+    if (_activePlaylistId == null) {
+      await prefs.remove(_prefsActivePlaylistKey);
+    } else {
+      await prefs.setString(_prefsActivePlaylistKey, _activePlaylistId!);
+    }
+    await prefs.setStringList(_prefsQueueOrderKey, _queue.map((track) => track.id).toList());
+    await prefs.setStringList(_prefsRecentSearchesKey, _recentDiscoverSearches);
+    await prefs.setStringList(_prefsDownloadedTracksKey, _downloadedTrackIds.toList());
+  }
+
   List<DemoTrack> _tracksForPlaylist(DemoPlaylist playlist) {
     return _playlistTracks[playlist.id] ?? playlist.tracks;
   }
@@ -250,6 +323,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _activePlaylistId = playlist.id;
     _queue = List<DemoTrack>.of(tracks);
     final initialIndex = _queue.indexWhere((track) => track.id == selected.id);
+    await _persistUiState();
     await _loadQueue(initialIndex: initialIndex < 0 ? 0 : initialIndex, autoPlay: true);
   }
 
@@ -266,6 +340,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
     _activePlaylistId = playlist.id;
     _queue = List<DemoTrack>.of(result.tracks);
+    await _persistUiState();
     await _loadQueue(initialIndex: result.startIndex, autoPlay: true);
   }
 
@@ -289,6 +364,58 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
   }
 
+  void _applyDiscoverSearch(String value, {bool addToRecent = false}) {
+    final normalized = value.trim();
+    setState(() {
+      _discoverQuery = normalized;
+      _discoverSearchController.value = TextEditingValue(
+        text: normalized,
+        selection: TextSelection.collapsed(offset: normalized.length),
+      );
+
+      if (addToRecent && normalized.isNotEmpty) {
+        _recentDiscoverSearches.removeWhere(
+          (entry) => entry.toLowerCase() == normalized.toLowerCase(),
+        );
+        _recentDiscoverSearches.insert(0, normalized);
+        if (_recentDiscoverSearches.length > 5) {
+          _recentDiscoverSearches.removeRange(5, _recentDiscoverSearches.length);
+        }
+      }
+    });
+    if (addToRecent && normalized.isNotEmpty) {
+      _persistUiState();
+    }
+  }
+
+  List<String> _discoverSuggestions(String query) {
+    final normalized = query.trim().toLowerCase();
+    final source = <String>[
+      ..._recentDiscoverSearches,
+      ...demoPlaylists.map((playlist) => playlist.name),
+      ...allTracks.map((track) => track.title),
+      ...allTracks.map((track) => track.artist),
+      'Night drive',
+      'Focus mix',
+      'Workout energy',
+      'Chill vibes',
+    ];
+
+    final seen = <String>{};
+    final filtered = <String>[];
+    for (final item in source) {
+      final candidate = item.trim();
+      if (candidate.isEmpty) continue;
+      final lower = candidate.toLowerCase();
+      if (seen.contains(lower)) continue;
+      if (normalized.isNotEmpty && !lower.contains(normalized)) continue;
+      seen.add(lower);
+      filtered.add(candidate);
+      if (filtered.length >= 8) break;
+    }
+    return filtered;
+  }
+
   Future<void> _addToQueueNext(DemoTrack track) async {
     final existingIndex = _queue.indexWhere((item) => item.id == track.id);
     final current = _trackIndex;
@@ -307,6 +434,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     final currentId = _currentTrack.id;
     _queue = mutable;
     final nextCurrentIndex = _queue.indexWhere((item) => item.id == currentId);
+    await _persistUiState();
     await _loadQueue(initialIndex: nextCurrentIndex < 0 ? 0 : nextCurrentIndex, autoPlay: _player.playing);
   }
 
@@ -319,6 +447,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _queue = updated;
 
     final nextCurrentIndex = _queue.indexWhere((item) => item.id == currentId);
+    await _persistUiState();
     await _loadQueue(initialIndex: nextCurrentIndex < 0 ? 0 : nextCurrentIndex, autoPlay: _player.playing);
   }
 
@@ -337,6 +466,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       nextIndex = index.clamp(0, _queue.length - 1);
     }
 
+    await _persistUiState();
     await _loadQueue(initialIndex: nextIndex, autoPlay: _player.playing);
   }
 
@@ -353,6 +483,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _queue = mutable;
 
     final nextCurrentIndex = _queue.indexWhere((item) => item.id == currentId);
+    await _persistUiState();
     await _loadQueue(initialIndex: nextCurrentIndex < 0 ? 0 : nextCurrentIndex, autoPlay: _player.playing);
   }
 
@@ -364,6 +495,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _downloadedTrackIds.add(track.id);
       }
     });
+    _persistUiState();
   }
 
   Widget _heroCard() {
@@ -439,6 +571,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           child: TextField(
             controller: _discoverSearchController,
             onChanged: (value) => setState(() => _discoverQuery = value),
+            onSubmitted: (value) => _applyDiscoverSearch(value, addToRecent: true),
             style: const TextStyle(color: Color(0xFFE6EEFF)),
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFC3D2F5)),
@@ -459,6 +592,44 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           ),
         ),
         const SizedBox(height: 22),
+        if (_recentDiscoverSearches.isNotEmpty) ...[
+          Text('Recent Searches', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _recentDiscoverSearches
+                .map(
+                  (term) => ActionChip(
+                    label: Text(term),
+                    onPressed: () => _applyDiscoverSearch(term),
+                    backgroundColor: const Color(0x281A2B54),
+                    labelStyle: const TextStyle(color: Color(0xFFE6EEFF)),
+                    side: const BorderSide(color: Color(0x2FAFC2FF)),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 18),
+        ],
+        Text('Suggestions', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _discoverSuggestions(_discoverQuery)
+              .map(
+                (term) => ActionChip(
+                  label: Text(term),
+                  onPressed: () => _applyDiscoverSearch(term, addToRecent: true),
+                  backgroundColor: const Color(0x281A2B54),
+                  labelStyle: const TextStyle(color: Color(0xFFE6EEFF)),
+                  side: const BorderSide(color: Color(0x2FAFC2FF)),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 18),
         if (_discoverQuery.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -791,27 +962,46 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             onReorder: _reorderQueue,
             itemBuilder: (context, index) {
               final track = _queue[index];
-              return Container(
-                key: ValueKey(track.id),
-                margin: const EdgeInsets.only(bottom: 10),
-                child: _trackRow(
-                  track: track,
-                  index: index,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ReorderableDragStartListener(
-                        index: index,
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Icon(Icons.drag_indicator_rounded, color: Color(0xFFC3D2F5)),
+              return Dismissible(
+                key: ValueKey('queue-${track.id}'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: const Color(0xFF4B1730),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+                ),
+                confirmDismiss: (_) async => _queue.length > 1,
+                onDismissed: (_) => _removeFromQueue(index),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: _trackRow(
+                    track: track,
+                    index: index,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => _addToQueueNext(track),
+                          icon: const Icon(Icons.playlist_play_rounded, color: Color(0xFFC3D2F5)),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => _removeFromQueue(index),
-                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFC3D2F5)),
-                      ),
-                    ],
+                        IconButton(
+                          onPressed: () => _removeFromQueue(index),
+                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFC3D2F5)),
+                        ),
+                        ReorderableDragStartListener(
+                          index: index,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Icon(Icons.drag_indicator_rounded, color: Color(0xFFC3D2F5)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -856,6 +1046,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   @override
   void dispose() {
+    _discoverSearchController.dispose();
     _player.dispose();
     super.dispose();
   }
@@ -943,7 +1134,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   Widget _navChip(int index, IconData icon, String label) {
     final selected = _currentTab == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentTab = index),
+      onTap: () {
+        setState(() => _currentTab = index);
+        _persistUiState();
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOut,
