@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -156,6 +158,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   static const String _prefsQueueOrderKey = 'sevenk.queueOrder.v1';
   static const String _prefsRecentSearchesKey = 'sevenk.recentSearches.v1';
   static const String _prefsDownloadedTracksKey = 'sevenk.downloadedTrackIds.v1';
+  static const String _prefsPlaylistsKey = 'sevenk.playlists.v1';
 
   int _currentTab = 0;
   int _trackIndex = 0;
@@ -247,9 +250,81 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     return null;
   }
 
+  DemoPlaylist? _playlistFromJson(Map<String, dynamic> data) {
+    final id = data['id'];
+    final name = data['name'];
+    final description = data['description'];
+    final trackIdsDynamic = data['trackIds'];
+
+    if (id is! String || name is! String || description is! String || trackIdsDynamic is! List) {
+      return null;
+    }
+
+    final trackIds = trackIdsDynamic.whereType<String>();
+    final tracks = trackIds.map(_trackFromId).whereType<DemoTrack>().toList();
+    if (tracks.isEmpty) {
+      return null;
+    }
+
+    return DemoPlaylist(
+      id: id,
+      name: name,
+      description: description,
+      tracks: tracks,
+    );
+  }
+
+  Future<void> _persistPlaylists() async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+
+    final payload = demoPlaylists
+        .map((playlist) {
+          final tracks = _playlistTracks[playlist.id] ?? playlist.tracks;
+          return {
+            'id': playlist.id,
+            'name': playlist.name,
+            'description': playlist.description,
+            'trackIds': tracks.map((track) => track.id).toList(),
+          };
+        })
+        .toList();
+
+    await prefs.setString(_prefsPlaylistsKey, jsonEncode(payload));
+  }
+
   Future<void> _restoreUiState() async {
     final prefs = _prefs;
     if (prefs == null) return;
+
+    final rawPlaylists = prefs.getString(_prefsPlaylistsKey);
+    if (rawPlaylists != null && rawPlaylists.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawPlaylists);
+        if (decoded is List) {
+          final restored = decoded
+              .whereType<Map>()
+              .map((item) => item.map((key, value) => MapEntry(key.toString(), value)))
+              .map(_playlistFromJson)
+              .whereType<DemoPlaylist>()
+              .toList();
+
+          if (restored.isNotEmpty) {
+            demoPlaylists
+              ..clear()
+              ..addAll(restored);
+
+            _playlistTracks
+              ..clear()
+              ..addEntries(
+                restored.map((playlist) => MapEntry(playlist.id, List<DemoTrack>.of(playlist.tracks))),
+              );
+          }
+        }
+      } catch (_) {
+        // Ignore malformed playlist cache and continue with defaults.
+      }
+    }
 
     setState(() {
       _currentTab = prefs.getInt(_prefsCurrentTabKey) ?? 0;
@@ -299,6 +374,111 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     await prefs.setStringList(_prefsQueueOrderKey, _queue.map((track) => track.id).toList());
     await prefs.setStringList(_prefsRecentSearchesKey, _recentDiscoverSearches);
     await prefs.setStringList(_prefsDownloadedTracksKey, _downloadedTrackIds.toList());
+    await _persistPlaylists();
+  }
+
+  Future<void> _renamePlaylist(DemoPlaylist playlist) async {
+    final controller = TextEditingController(text: playlist.name);
+    final nextName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Rename playlist'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Playlist name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+    final name = nextName?.trim();
+    if (name == null || name.isEmpty || name == playlist.name) {
+      return;
+    }
+
+    final index = demoPlaylists.indexWhere((item) => item.id == playlist.id);
+    if (index < 0) return;
+
+    setState(() {
+      final tracks = _playlistTracks[playlist.id] ?? playlist.tracks;
+      demoPlaylists[index] = DemoPlaylist(
+        id: playlist.id,
+        name: name,
+        description: playlist.description,
+        tracks: tracks,
+      );
+    });
+
+    await _persistUiState();
+  }
+
+  Future<void> _deletePlaylist(DemoPlaylist playlist) async {
+    if (demoPlaylists.length <= 1) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('At least one playlist is required.')));
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete playlist?'),
+        content: Text('Remove "${playlist.name}" from your library?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || shouldDelete != true) {
+      return;
+    }
+
+    setState(() {
+      demoPlaylists.removeWhere((item) => item.id == playlist.id);
+      _playlistTracks.remove(playlist.id);
+      if (_activePlaylistId == playlist.id) {
+        _activePlaylistId = demoPlaylists.first.id;
+      }
+    });
+
+    await _persistUiState();
+  }
+
+  Future<void> _reorderLibraryPlaylists(int oldIndex, int newIndex) async {
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+    if (oldIndex == newIndex) return;
+
+    setState(() {
+      final moved = demoPlaylists.removeAt(oldIndex);
+      demoPlaylists.insert(newIndex, moved);
+    });
+
+    await _persistUiState();
   }
 
   List<DemoTrack> _tracksForPlaylist(DemoPlaylist playlist) {
@@ -330,7 +510,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   Future<void> _openPlaylistDetail(DemoPlaylist playlist) async {
     final result = await Navigator.of(context).push<_PlaylistDetailResult>(
       MaterialPageRoute(
-        builder: (_) => PlaylistDetailScreen(playlist: playlist),
+        builder: (_) => PlaylistDetailScreen(
+          playlist: DemoPlaylist(
+            id: playlist.id,
+            name: playlist.name,
+            description: playlist.description,
+            tracks: List<DemoTrack>.of(_tracksForPlaylist(playlist)),
+          ),
+        ),
       ),
     );
 
@@ -339,6 +526,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     _activePlaylistId = playlist.id;
+    _playlistTracks[playlist.id] = List<DemoTrack>.of(result.tracks);
     _queue = List<DemoTrack>.of(result.tracks);
     await _persistUiState();
     await _loadQueue(initialIndex: result.startIndex, autoPlay: true);
@@ -485,6 +673,74 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     final nextCurrentIndex = _queue.indexWhere((item) => item.id == currentId);
     await _persistUiState();
     await _loadQueue(initialIndex: nextCurrentIndex < 0 ? 0 : nextCurrentIndex, autoPlay: _player.playing);
+  }
+
+  Future<void> _restoreQueue(List<DemoTrack> restoredQueue, String currentTrackId) async {
+    if (restoredQueue.isEmpty) return;
+
+    _queue = List<DemoTrack>.of(restoredQueue);
+    final restoredIndex = _queue.indexWhere((track) => track.id == currentTrackId);
+    await _persistUiState();
+    await _loadQueue(
+      initialIndex: restoredIndex < 0 ? 0 : restoredIndex,
+      autoPlay: _player.playing,
+    );
+  }
+
+  Future<void> _clearQueueWithUndo() async {
+    if (_queue.length <= 1) {
+      return;
+    }
+
+    final previousQueue = List<DemoTrack>.of(_queue);
+    final previousCurrentTrackId = _currentTrack.id;
+
+    _queue = <DemoTrack>[_currentTrack];
+    await _persistUiState();
+    await _loadQueue(initialIndex: 0, autoPlay: _player.playing);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Queue cleared'),
+          action: SnackBarAction(
+            label: 'UNDO',
+            onPressed: () {
+              _restoreQueue(previousQueue, previousCurrentTrackId);
+            },
+          ),
+        ),
+      );
+  }
+
+  Future<void> _saveQueueAsPlaylist() async {
+    if (_queue.isEmpty) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final name = 'Queue Mix ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final playlist = DemoPlaylist(
+      id: 'pl-user-${now.millisecondsSinceEpoch}',
+      name: name,
+      description: 'Saved from queue',
+      tracks: List<DemoTrack>.of(_queue),
+    );
+
+    setState(() {
+      demoPlaylists.insert(0, playlist);
+      _playlistTracks[playlist.id] = List<DemoTrack>.of(_queue);
+      _activePlaylistId = playlist.id;
+    });
+
+    await _persistUiState();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text('Saved "$name" to Library')));
   }
 
   void _toggleOffline(DemoTrack track) {
@@ -728,26 +984,67 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         const SizedBox(height: 24),
         Text('Playlists', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
-        ...demoPlaylists.map((playlist) {
-          final selected = playlist.id == activePlaylist.id;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: selected ? const Color(0x3A8AAFFF) : const Color(0x261A2B54),
-              border: Border.all(color: selected ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF)),
-            ),
-            child: ListTile(
-              onTap: () => _openPlaylistDetail(playlist),
-              title: Text(playlist.name),
-              subtitle: Text('${playlist.tracks.length} tracks • ${playlist.description}'),
-              trailing: IconButton(
-                icon: const Icon(Icons.play_arrow_rounded),
-                onPressed: () => _playFromPlaylist(playlist, 0),
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: demoPlaylists.length,
+          onReorder: _reorderLibraryPlaylists,
+          itemBuilder: (context, index) {
+            final playlist = demoPlaylists[index];
+            final selected = playlist.id == activePlaylist.id;
+            final tracks = _playlistTracks[playlist.id] ?? playlist.tracks;
+            return Container(
+              key: ValueKey('playlist-${playlist.id}'),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                color: selected ? const Color(0x3A8AAFFF) : const Color(0x261A2B54),
+                border: Border.all(color: selected ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF)),
               ),
-            ),
-          );
-        }),
+              child: ListTile(
+                onTap: () => _openPlaylistDetail(playlist),
+                title: Text(playlist.name),
+                subtitle: Text('${tracks.length} tracks • ${playlist.description}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      onPressed: () => _playFromPlaylist(playlist, 0),
+                    ),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'rename') {
+                          _renamePlaylist(playlist);
+                        }
+                        if (value == 'delete') {
+                          _deletePlaylist(playlist);
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem<String>(
+                          value: 'rename',
+                          child: Text('Rename'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Text('Delete'),
+                        ),
+                      ],
+                    ),
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(Icons.drag_indicator_rounded, color: Color(0xFFC3D2F5)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 14),
         Text(activePlaylist.name, style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
@@ -946,12 +1243,43 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Column(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Queue', style: GoogleFonts.sora(fontSize: 34, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Text('${_queue.length} songs lined up • drag to reorder', style: const TextStyle(color: Color(0xFFB7C7EB))),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Queue', style: GoogleFonts.sora(fontSize: 34, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_queue.length} songs lined up • drag to reorder',
+                      style: const TextStyle(color: Color(0xFFB7C7EB)),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFFC3D2F5)),
+                onSelected: (value) {
+                  if (value == 'save') {
+                    _saveQueueAsPlaylist();
+                  }
+                  if (value == 'clear') {
+                    _clearQueueWithUndo();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem<String>(
+                    value: 'save',
+                    child: Text('Save Queue as Playlist'),
+                  ),
+                  PopupMenuItem<String>(
+                    value: 'clear',
+                    child: Text('Clear Queue'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
