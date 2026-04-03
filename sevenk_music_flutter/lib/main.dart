@@ -212,23 +212,21 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   Future<void> _loadQueue({required int initialIndex, required bool autoPlay}) async {
     setState(() => _loadingSource = true);
 
-    final source = ConcatenatingAudioSource(
-      children: _queue
-          .map(
-            (track) => AudioSource.uri(
-              Uri.parse(track.audioUrl),
-              tag: MediaItem(
-                id: track.id,
-                title: track.title,
-                artist: track.artist,
-                artUri: Uri.parse(track.artUrl),
-              ),
+    final sources = _queue
+        .map(
+          (track) => AudioSource.uri(
+            Uri.parse(track.audioUrl),
+            tag: MediaItem(
+              id: track.id,
+              title: track.title,
+              artist: track.artist,
+              artUri: Uri.parse(track.artUrl),
             ),
-          )
-          .toList(),
-    );
+          ),
+        )
+        .toList();
 
-    await _player.setAudioSource(source, initialIndex: initialIndex);
+    await _player.setAudioSources(sources, initialIndex: initialIndex);
     if (autoPlay) {
       await _player.play();
     }
