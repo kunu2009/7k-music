@@ -204,7 +204,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       debugPrint('Startup init failed: $error');
       if (mounted) {
         setState(() {
-          _startupError = 'Audio init failed. Tap Retry.';
+          _startupError = 'Audio unavailable. Tap Retry to reconnect.';
           _loadingSource = false;
         });
       }
@@ -247,9 +247,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           )
           .toList();
 
+      // Use longer timeout on older devices (30s instead of 15s)
       await _player
           .setAudioSources(sources, initialIndex: initialIndex)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
       if (autoPlay) {
         await _player.play();
       }
@@ -257,7 +258,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       debugPrint('Queue load failed: $error');
       if (mounted) {
         setState(() {
-          _startupError = 'Could not load audio on this device.';
+          _startupError = 'Could not load audio. Check network and tap Retry.';
         });
       }
     } finally {
@@ -1431,27 +1432,51 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             children: [
               if (_loadingSource)
                 const Center(child: CircularProgressIndicator())
-              else if (_startupError != null)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline_rounded, size: 42, color: Color(0xFFC7D4FF)),
-                        const SizedBox(height: 12),
-                        Text(_startupError!, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: () => _loadQueue(initialIndex: 0, autoPlay: false),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
               else
-                IndexedStack(index: _currentTab, children: pages),
+                Column(
+                  children: [
+                    // Error banner at top (non-blocking)
+                    if (_startupError != null)
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0x4DB74562),
+                          border: Border.all(color: const Color(0xFFE57373)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_rounded, size: 18, color: Color(0xFFE57373)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _startupError!,
+                                style: const TextStyle(color: Color(0xFFFFCDD2), fontSize: 13),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              onPressed: () => _loadQueue(initialIndex: 0, autoPlay: false),
+                              icon: const Icon(Icons.refresh_rounded, size: 14),
+                              label: const Text('Retry'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                backgroundColor: const Color(0xFFE57373),
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Pages remain visible below banner
+                    Expanded(
+                      child: IndexedStack(index: _currentTab, children: pages),
+                    ),
+                  ],
+                ),
               if (!_loadingSource && _currentTab != 2)
                 Align(
                   alignment: Alignment.bottomCenter,
