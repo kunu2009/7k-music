@@ -9,11 +9,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.sevenkmusic.player.channel.audio',
-    androidNotificationChannelName: '7K Music Playback',
-    androidNotificationOngoing: true,
-  );
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.sevenkmusic.player.channel.audio',
+      androidNotificationChannelName: '7K Music Playback',
+      androidNotificationOngoing: true,
+    );
+  } catch (error) {
+    // Keep app startup resilient on older/quirky Android builds.
+    debugPrint('JustAudioBackground init failed: $error');
+  }
 
   runApp(const SevenKMusicApp());
 }
@@ -175,6 +180,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _shuffleEnabled = false;
   bool _loadingSource = true;
   bool _lyricsExpanded = true;
+  String? _startupError;
   SharedPreferences? _prefs;
   
 
@@ -186,13 +192,24 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _init() async {
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.music());
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
 
-    _prefs = await SharedPreferences.getInstance();
-    await _restoreUiState();
+      _prefs = await SharedPreferences.getInstance();
+      await _restoreUiState();
 
-    await _loadQueue(initialIndex: 0, autoPlay: false);
+      await _loadQueue(initialIndex: 0, autoPlay: false);
+    } catch (error) {
+      debugPrint('Startup init failed: $error');
+      if (mounted) {
+        setState(() {
+          _startupError = 'Audio init failed. Tap Retry.';
+          _loadingSource = false;
+        });
+      }
+    }
+
     _player.currentIndexStream.listen((index) {
       if (!mounted || index == null) return;
       setState(() => _trackIndex = index);
@@ -210,32 +227,46 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _loadQueue({required int initialIndex, required bool autoPlay}) async {
-    setState(() => _loadingSource = true);
+    setState(() {
+      _loadingSource = true;
+      _startupError = null;
+    });
 
-    final sources = _queue
-        .map(
-          (track) => AudioSource.uri(
-            Uri.parse(track.audioUrl),
-            tag: MediaItem(
-              id: track.id,
-              title: track.title,
-              artist: track.artist,
-              artUri: Uri.parse(track.artUrl),
+    try {
+      final sources = _queue
+          .map(
+            (track) => AudioSource.uri(
+              Uri.parse(track.audioUrl),
+              tag: MediaItem(
+                id: track.id,
+                title: track.title,
+                artist: track.artist,
+                artUri: Uri.parse(track.artUrl),
+              ),
             ),
-          ),
-        )
-        .toList();
+          )
+          .toList();
 
-    await _player.setAudioSources(sources, initialIndex: initialIndex);
-    if (autoPlay) {
-      await _player.play();
-    }
-
-    if (mounted) {
-      setState(() {
-        _trackIndex = initialIndex;
-        _loadingSource = false;
-      });
+      await _player
+          .setAudioSources(sources, initialIndex: initialIndex)
+          .timeout(const Duration(seconds: 15));
+      if (autoPlay) {
+        await _player.play();
+      }
+    } catch (error) {
+      debugPrint('Queue load failed: $error');
+      if (mounted) {
+        setState(() {
+          _startupError = 'Could not load audio on this device.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _trackIndex = initialIndex;
+          _loadingSource = false;
+        });
+      }
     }
   }
 
@@ -1400,6 +1431,25 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             children: [
               if (_loadingSource)
                 const Center(child: CircularProgressIndicator())
+              else if (_startupError != null)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, size: 42, color: Color(0xFFC7D4FF)),
+                        const SizedBox(height: 12),
+                        Text(_startupError!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: () => _loadQueue(initialIndex: 0, autoPlay: false),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               else
                 IndexedStack(index: _currentTab, children: pages),
               if (!_loadingSource && _currentTab != 2)
