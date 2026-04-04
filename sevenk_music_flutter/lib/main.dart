@@ -130,6 +130,81 @@ final demoPlaylists = <DemoPlaylist>[
   ),
 ];
 
+class RoyaltyFreeService {
+  final String name;
+  final String description;
+  final String category;
+  final String url;
+  final String icon;
+
+  const RoyaltyFreeService({
+    required this.name,
+    required this.description,
+    required this.category,
+    required this.url,
+    required this.icon,
+  });
+}
+
+final royaltyFreeServices = <RoyaltyFreeService>[
+  RoyaltyFreeService(
+    name: 'Free Music Archive',
+    description: 'Curated royalty-free music from independent artists',
+    category: 'Music',
+    url: 'https://freemusicarchive.org',
+    icon: '🎵',
+  ),
+  RoyaltyFreeService(
+    name: 'Incompetech',
+    description: 'High-quality background music for creators',
+    category: 'Music',
+    url: 'https://incompetech.com',
+    icon: '🎼',
+  ),
+  RoyaltyFreeService(
+    name: 'Pixabay Music',
+    description: 'Free music library with 1000+ tracks',
+    category: 'Music',
+    url: 'https://pixabay.com/music',
+    icon: '🎶',
+  ),
+  RoyaltyFreeService(
+    name: 'YouTube Audio Library',
+    description: 'Free music and sound effects from YouTube',
+    category: 'Music',
+    url: 'https://www.youtube.com/audiolibrary',
+    icon: '🎵',
+  ),
+  RoyaltyFreeService(
+    name: 'Epidemic Sound',
+    description: 'Royalty-free music for content creators',
+    category: 'Music',
+    url: 'https://www.epidemicsound.com',
+    icon: '🎧',
+  ),
+  RoyaltyFreeService(
+    name: 'Bensound',
+    description: 'Free, downloadable background music',
+    category: 'Music',
+    url: 'https://www.bensound.com',
+    icon: '🎹',
+  ),
+  RoyaltyFreeService(
+    name: 'ccMixter',
+    description: 'Licensed creative commons music',
+    category: 'Music',
+    url: 'https://ccmixter.org',
+    icon: '🎤',
+  ),
+  RoyaltyFreeService(
+    name: 'Jamendo',
+    description: 'Millions of free music tracks and albums',
+    category: 'Music',
+    url: 'https://www.jamendo.com',
+    icon: '🎸',
+  ),
+];
+
 class SevenKMusicApp extends StatelessWidget {
   const SevenKMusicApp({super.key});
 
@@ -171,8 +246,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   static const String _prefsRecentSearchesKey = 'sevenk.recentSearches.v1';
   static const String _prefsDownloadedTracksKey = 'sevenk.downloadedTrackIds.v1';
   static const String _prefsPlaylistsKey = 'sevenk.playlists.v1';
+  static const String _prefsLibraryTabKey = 'sevenk.libraryTab.v1';
 
   int _currentTab = 0;
+  int _libraryTabIndex = 0; // 0 = Playlists, 1 = Downloads, 2 = Royalty-Free
   int _trackIndex = 0;
   List<DemoTrack> _queue = List.of(allTracks);
   String? _activePlaylistId;
@@ -441,40 +518,52 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     try {
-      final uri = Uri.https('itunes.apple.com', '/search', {
-        'term': normalized,
-        'entity': 'song',
-        'limit': '25',
+      // Replace with your YouTube API key from https://console.cloud.google.com
+      const youtubeApiKey = 'YOUR_YOUTUBE_API_KEY_HERE';
+      
+      // Use YouTube Data API v3 to search for music videos
+      final uri = Uri.https('www.googleapis.com', '/youtube/v3/search', {
+        'q': normalized,
+        'part': 'snippet',
+        'maxResults': '25',
+        'type': 'video',
+        'videoCategoryId': '10', // Music category
+        'key': youtubeApiKey,
+        'order': 'relevance',
       });
 
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        throw Exception('Search failed');
+        throw Exception('YouTube API request failed: ${response.statusCode}');
       }
 
       final decoded = jsonDecode(response.body);
-      final results = decoded is Map<String, dynamic> && decoded['results'] is List
-          ? decoded['results'] as List
+      final items = decoded is Map<String, dynamic> && decoded['items'] is List
+          ? decoded['items'] as List
           : const <dynamic>[];
 
       final parsed = <DemoTrack>[];
-      for (final entry in results) {
-        if (entry is! Map<String, dynamic>) continue;
-        final previewUrl = entry['previewUrl']?.toString();
-        final title = entry['trackName']?.toString();
-        if (previewUrl == null || title == null || title.trim().isEmpty) continue;
-        final artist = entry['artistName']?.toString() ?? 'Unknown Artist';
-        final art = entry['artworkUrl100']?.toString() ?? _fallbackArtUrl;
-        final trackId = entry['trackId']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString();
+      for (final item in items) {
+        if (item is! Map<String, dynamic>) continue;
+        
+        final snippet = item['snippet'];
+        if (snippet is! Map<String, dynamic>) continue;
+        
+        final videoId = item['id']?['videoId']?.toString();
+        final title = snippet['title']?.toString();
+        final channelTitle = snippet['channelTitle']?.toString();
+        final thumbnail = snippet['thumbnails']?['medium']?['url']?.toString();
+        
+        if (videoId == null || title == null || title.trim().isEmpty) continue;
 
         parsed.add(
           DemoTrack(
-            id: 'it-$trackId',
+            id: 'yt-$videoId',
             title: title,
-            artist: artist,
-            audioUrl: previewUrl,
-            artUrl: art,
-            lyrics: 'Online preview track.',
+            artist: channelTitle ?? 'Unknown Artist',
+            audioUrl: 'https://www.youtube.com/watch?v=$videoId',
+            artUrl: thumbnail ?? _fallbackArtUrl,
+            lyrics: 'YouTube music video. Click to play on YouTube.',
           ),
         );
       }
@@ -484,13 +573,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _discoverRemoteTracks
           ..clear()
           ..addAll(parsed);
-        _discoverSearchError = parsed.isEmpty ? 'No online results for this search.' : null;
+        _discoverSearchError = parsed.isEmpty ? 'No results on YouTube.' : null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
-        _discoverSearchError = 'Online search failed. Check network and try again.';
+        _discoverSearchError = 'YouTube search failed. Add API key in code. Check network and try again.';
       });
+      debugPrint('YouTube search error: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -606,6 +696,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       final savedTab = prefs.getInt(_prefsCurrentTabKey) ?? 0;
       _currentTab = savedTab.clamp(0, 3);
 
+      final savedLibraryTab = prefs.getInt(_prefsLibraryTabKey) ?? 0;
+      _libraryTabIndex = savedLibraryTab.clamp(0, 2);
+
       final recentSearches = prefs.getStringList(_prefsRecentSearchesKey) ?? const <String>[];
       _recentDiscoverSearches
         ..clear()
@@ -643,6 +736,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     if (prefs == null) return;
 
     await prefs.setInt(_prefsCurrentTabKey, _currentTab);
+    await prefs.setInt(_prefsLibraryTabKey, _libraryTabIndex);
     if (_activePlaylistId == null) {
       await prefs.remove(_prefsActivePlaylistKey);
     } else {
@@ -1271,175 +1365,279 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             orElse: () => demoPlaylists.first,
           );
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+    return Column(
       children: [
-        Text('Library', style: GoogleFonts.sora(fontSize: 34, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: const [
-            _InfoPill(label: 'Recent', icon: Icons.history_rounded),
-            _InfoPill(label: 'Favorites', icon: Icons.favorite_border_rounded),
-            _InfoPill(label: 'Offline', icon: Icons.download_done_rounded),
-            _InfoPill(label: 'Podcasts', icon: Icons.podcasts_rounded),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Text('Playlists', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        ReorderableListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: demoPlaylists.length,
-          onReorder: _reorderLibraryPlaylists,
-          itemBuilder: (context, index) {
-            final playlist = demoPlaylists[index];
-            final selected = playlist.id == activePlaylist.id;
-            final tracks = _playlistTracks[playlist.id] ?? playlist.tracks;
-            return Container(
-              key: ValueKey('playlist-${playlist.id}'),
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: selected ? const Color(0x3A8AAFFF) : const Color(0x261A2B54),
-                border: Border.all(color: selected ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF)),
-              ),
-              child: ListTile(
-                onTap: () => _openPlaylistDetail(playlist),
-                title: Text(playlist.name),
-                subtitle: Text('${tracks.length} tracks • ${playlist.description}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Library', style: GoogleFonts.sora(fontSize: 34, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              // Tab buttons
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      onPressed: () => _playFromPlaylist(playlist, 0),
+                    _LibraryTabButton(
+                      label: 'Playlists',
+                      icon: Icons.playlist_play_rounded,
+                      isSelected: _libraryTabIndex == 0,
+                      onPressed: () => setState(() => _libraryTabIndex = 0),
                     ),
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'rename') {
-                          _renamePlaylist(playlist);
-                        }
-                        if (value == 'delete') {
-                          _deletePlaylist(playlist);
-                        }
-                      },
-                      itemBuilder: (context) => const [
-                        PopupMenuItem<String>(
-                          value: 'rename',
-                          child: Text('Rename'),
-                        ),
-                        PopupMenuItem<String>(
-                          value: 'delete',
-                          child: Text('Delete'),
-                        ),
-                      ],
+                    const SizedBox(width: 10),
+                    _LibraryTabButton(
+                      label: 'Downloads',
+                      icon: Icons.download_done_rounded,
+                      isSelected: _libraryTabIndex == 1,
+                      onPressed: () => setState(() => _libraryTabIndex = 1),
                     ),
-                    ReorderableDragStartListener(
-                      index: index,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6),
-                        child: Icon(Icons.drag_indicator_rounded, color: Color(0xFFC3D2F5)),
-                      ),
+                    const SizedBox(width: 10),
+                    _LibraryTabButton(
+                      label: 'Free Music',
+                      icon: Icons.music_note_rounded,
+                      isSelected: _libraryTabIndex == 2,
+                      onPressed: () => setState(() => _libraryTabIndex = 2),
                     ),
                   ],
                 ),
               ),
-            );
-          },
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
-        const SizedBox(height: 14),
-        Text(activePlaylist.name, style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        ...activePlaylist.tracks.asMap().entries.map((entry) {
-          final queueIndex = _queue.indexWhere((item) => item.id == entry.value.id);
-          return _trackRow(
-            track: entry.value,
-            queueIndex: queueIndex,
-            onTap: () => _playFromPlaylist(activePlaylist, entry.key),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  onPressed: () => _addToQueue(entry.value),
-                  icon: const Icon(Icons.queue_music_rounded, color: Color(0xFFC3D2F5)),
-                ),
-                IconButton(
-                  onPressed: () => _toggleOffline(entry.value),
-                  icon: Icon(
-                    _downloadedTrackIds.contains(entry.value.id)
-                        ? Icons.download_done_rounded
-                        : Icons.download_for_offline_outlined,
-                    color: const Color(0xFFC3D2F5),
+        Expanded(
+          child: IndexedStack(
+            index: _libraryTabIndex,
+            children: [
+              // Tab 0: Playlists
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                children: [
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: demoPlaylists.length,
+                    onReorder: _reorderLibraryPlaylists,
+                    itemBuilder: (context, index) {
+                      final playlist = demoPlaylists[index];
+                      final selected = playlist.id == activePlaylist.id;
+                      final tracks = _playlistTracks[playlist.id] ?? playlist.tracks;
+                      return Container(
+                        key: ValueKey('playlist-${playlist.id}'),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          color: selected ? const Color(0x3A8AAFFF) : const Color(0x261A2B54),
+                          border: Border.all(color: selected ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF)),
+                        ),
+                        child: ListTile(
+                          onTap: () => _openPlaylistDetail(playlist),
+                          title: Text(playlist.name),
+                          subtitle: Text('${tracks.length} tracks • ${playlist.description}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.play_arrow_rounded),
+                                onPressed: () => _playFromPlaylist(playlist, 0),
+                              ),
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'rename') {
+                                    _renamePlaylist(playlist);
+                                  }
+                                  if (value == 'delete') {
+                                    _deletePlaylist(playlist);
+                                  }
+                                },
+                                itemBuilder: (context) => const [
+                                  PopupMenuItem<String>(
+                                    value: 'rename',
+                                    child: Text('Rename'),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: 'delete',
+                                    child: Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6),
+                                  child: Icon(Icons.drag_indicator_rounded, color: Color(0xFFC3D2F5)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ],
-            ),
-          );
-        }),
-        const SizedBox(height: 24),
-        Text('Offline Library (Legal-safe)', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        if (_downloadedTracks.isEmpty)
-          const Text(
-            'No songs saved yet. This section is prepared for local files and legally allowed offline content only.',
-            style: TextStyle(color: Color(0xFFB7C7EB)),
-          )
-        else
-          ..._downloadedTracks.asMap().entries.map(
-                (entry) => _trackRow(
-                  track: entry.value,
-                  queueIndex: _queue.indexWhere((item) => item.id == entry.value.id),
-                  trailing: IconButton(
-                    onPressed: () => _toggleOffline(entry.value),
-                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFC3D2F5)),
-                  ),
-                  subtitleSuffix: 'Offline',
-                ),
+                  const SizedBox(height: 24),
+                  Text(activePlaylist.name, style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  ...activePlaylist.tracks.asMap().entries.map((entry) {
+                    final queueIndex = _queue.indexWhere((item) => item.id == entry.value.id);
+                    return _trackRow(
+                      track: entry.value,
+                      queueIndex: queueIndex,
+                      onTap: () => _playFromPlaylist(activePlaylist, entry.key),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: () => _addToQueue(entry.value),
+                            icon: const Icon(Icons.queue_music_rounded, color: Color(0xFFC3D2F5)),
+                          ),
+                          IconButton(
+                            onPressed: () => _toggleOffline(entry.value),
+                            icon: Icon(
+                              _downloadedTrackIds.contains(entry.value.id)
+                                  ? Icons.download_done_rounded
+                                  : Icons.download_for_offline_outlined,
+                              color: const Color(0xFFC3D2F5)),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
               ),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Device Audio Files', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
-            TextButton.icon(
-              onPressed: _loadDeviceAudio,
-              icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Refresh'),
-            ),
-          ],
+              // Tab 1: Downloads (Local & Offline)
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                children: [
+                  Text('Local Device Audio', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.topRight,
+                    child: TextButton.icon(
+                      onPressed: _loadDeviceAudio,
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Refresh'),
+                    ),
+                  ),
+                  if (_deviceAudioLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                          SizedBox(width: 8),
+                          Text('Scanning local music files...'),
+                        ],
+                      ),
+                    )
+                  else if (_deviceAudioError != null)
+                    Text(_deviceAudioError!, style: const TextStyle(color: Color(0xFFFFB4B4)))
+                  else if (_deviceSongs.isEmpty)
+                    const Text(
+                      'No local audio files found on this device yet.',
+                      style: TextStyle(color: Color(0xFFB7C7EB)),
+                    )
+                  else
+                    ..._deviceSongs.take(25).map(
+                          (song) => _trackRow(
+                            track: _demoTrackFromLocalSong(song),
+                            queueIndex: _queue.indexWhere((item) => item.id == 'local-${song.id}'),
+                            onTap: () => _playLocalSong(song),
+                            trailing: const Icon(Icons.folder_rounded, color: Color(0xFFC3D2F5)),
+                            subtitleSuffix: 'Local file',
+                          ),
+                        ),
+                  const SizedBox(height: 24),
+                  Text('Saved for Offline', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  if (_downloadedTracks.isEmpty)
+                    const Text(
+                      'No songs saved yet for offline playback.',
+                      style: TextStyle(color: Color(0xFFB7C7EB)),
+                    )
+                  else
+                    ..._downloadedTracks.asMap().entries.map(
+                          (entry) => _trackRow(
+                            track: entry.value,
+                            queueIndex: _queue.indexWhere((item) => item.id == entry.value.id),
+                            trailing: IconButton(
+                              onPressed: () => _toggleOffline(entry.value),
+                              icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFC3D2F5)),
+                            ),
+                            subtitleSuffix: 'Offline',
+                          ),
+                        ),
+                ],
+              ),
+              // Tab 2: Royalty-Free Music Services
+              ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                children: [
+                  Text(
+                    'Free & Royalty-Free Music',
+                    style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Download music from these copyright-free sources and add to your uploads or projects',
+                    style: TextStyle(color: Color(0xFFB7C7EB), fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  ...royaltyFreeServices.map((service) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: const Color(0x261A2B54),
+                        border: Border.all(color: const Color(0x2FAFC2FF)),
+                      ),
+                      child: ListTile(
+                        title: Row(
+                          children: [
+                            Text(service.icon, style: const TextStyle(fontSize: 20)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(service.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  Text(
+                                    service.category,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF93A6D1),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            service.description,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFFB7C7EB)),
+                          ),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFF8AAFFF)),
+                          onPressed: () {
+                            // In a real app, you'd use url_launcher to open the URL
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Opening ${service.name}...')),
+                            );
+                          },
+                        ),
+                        isThreeLine: true,
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        if (_deviceAudioLoading)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 8),
-                Text('Scanning local music files...'),
-              ],
-            ),
-          )
-        else if (_deviceAudioError != null)
-          Text(_deviceAudioError!, style: const TextStyle(color: Color(0xFFFFB4B4)))
-        else if (_deviceSongs.isEmpty)
-          const Text(
-            'No local audio files found on this device yet.',
-            style: TextStyle(color: Color(0xFFB7C7EB)),
-          )
-        else
-          ..._deviceSongs.take(25).map(
-                (song) => _trackRow(
-                  track: _demoTrackFromLocalSong(song),
-                  queueIndex: _queue.indexWhere((item) => item.id == 'local-${song.id}'),
-                  onTap: () => _playLocalSong(song),
-                  trailing: const Icon(Icons.folder_rounded, color: Color(0xFFC3D2F5)),
-                  subtitleSuffix: 'Local file',
-                ),
-              ),
       ],
     );
   }
@@ -2020,28 +2218,46 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 }
 
-class _InfoPill extends StatelessWidget {
-  const _InfoPill({required this.label, required this.icon});
+class _LibraryTabButton extends StatelessWidget {
+  const _LibraryTabButton({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onPressed,
+  });
 
   final String label;
   final IconData icon;
+  final bool isSelected;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0x2A203869),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0x35B0C5FF)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 17, color: const Color(0xFFC7D5F5)),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0x3A8AAFFF) : const Color(0x261A2B54),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: isSelected ? const Color(0xFF8AAFFF) : const Color(0xFFC3D2F5)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? const Color(0xFFE6EEFF) : const Color(0xFFB7C7EB),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -46,6 +46,19 @@ subprojects {
             }
         }
     }
+    if (name == "flutter_inappwebview") {
+        plugins.withId("com.android.library") {
+            val androidExt = extensions.findByName("android")
+            if (androidExt != null) {
+                try {
+                    val setNamespace = androidExt.javaClass.getMethod("setNamespace", String::class.java)
+                    setNamespace.invoke(androidExt, "com.pichillilorenzo.flutter_inappwebview")
+                } catch (_: Exception) {
+                    // Ignore if plugin/AGP exposes namespace differently.
+                }
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {
