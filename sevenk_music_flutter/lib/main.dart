@@ -518,11 +518,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     try {
-      // Call secure backend endpoint on Vercel (uses VITE_YOUTUBE_API_KEY env var)
-      final uri = Uri.https('7kmusic.vercel.app', '/api/search', {
+      // Call secure backend endpoint on custom domain (uses VITE_YOUTUBE_API_KEY env var from Vercel)
+      final uri = Uri.https('music.7kc.me', '/api/search', {
         'q': normalized,
         'maxResults': '25',
-      });
+      });}
 
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
