@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
@@ -103,6 +106,9 @@ const allTracks = <DemoTrack>[
   ),
 ];
 
+const String _fallbackArtUrl =
+  'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600';
+
 final demoPlaylists = <DemoPlaylist>[
   DemoPlaylist(
     id: 'pl-1',
@@ -156,6 +162,7 @@ class SevenKMusicShell extends StatefulWidget {
 
 class _SevenKMusicShellState extends State<SevenKMusicShell> {
   late final AudioPlayer _player;
+  final OnAudioQuery _audioQuery = OnAudioQuery();
   final TextEditingController _discoverSearchController = TextEditingController();
 
   static const String _prefsCurrentTabKey = 'sevenk.currentTab.v1';
@@ -170,7 +177,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   List<DemoTrack> _queue = List.of(allTracks);
   String? _activePlaylistId;
   String _discoverQuery = '';
+  String? _discoverSearchError;
+  String? _deviceAudioError;
   final List<String> _recentDiscoverSearches = <String>[];
+  final List<DemoTrack> _discoverRemoteTracks = <DemoTrack>[];
+  final List<SongModel> _deviceSongs = <SongModel>[];
   final Set<String> _downloadedTrackIds = <String>{};
   final Map<String, List<DemoTrack>> _playlistTracks = {
     for (final playlist in demoPlaylists) playlist.id: List<DemoTrack>.of(playlist.tracks),
@@ -179,6 +190,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   LoopMode _loopMode = LoopMode.off;
   bool _shuffleEnabled = false;
   bool _loadingSource = true;
+  bool _discoverSearching = false;
+  bool _deviceAudioLoading = false;
   bool _lyricsExpanded = true;
   bool _audioReady = false;
   String? _startupError;
@@ -201,6 +214,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       await _restoreUiState();
 
       await _loadQueue(initialIndex: 0, autoPlay: false);
+      unawaited(_loadDeviceAudio());
     } catch (error) {
       debugPrint('Startup init failed: $error');
       if (mounted) {
@@ -301,6 +315,206 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       return;
     }
     await _player.seekToPrevious();
+  }
+
+  DemoTrack _demoTrackFromLocalSong(SongModel song) {
+    return DemoTrack(
+      id: 'local-${song.id}',
+      title: song.title,
+      artist: song.artist ?? 'Unknown Artist',
+      audioUrl: song.uri ?? '',
+      artUrl: _fallbackArtUrl,
+      lyrics: 'Local file from your device storage.',
+    );
+  }
+
+  Future<void> _loadDeviceAudio() async {
+    if (mounted) {
+      setState(() {
+        _deviceAudioLoading = true;
+        _deviceAudioError = null;
+      });
+    }
+
+    try {
+      var hasPermission = await _audioQuery.permissionsStatus();
+      if (!hasPermission) {
+        hasPermission = await _audioQuery.permissionsRequest();
+      }
+
+      if (!hasPermission) {
+        throw Exception('Audio permission denied');
+      }
+
+      final songs = await _audioQuery.querySongs(
+        uriType: UriType.EXTERNAL,
+        orderType: OrderType.ASC_OR_SMALLER,
+        ignoreCase: true,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _deviceSongs
+          ..clear()
+          ..addAll(songs.where((song) => song.uri != null && song.duration != null));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _deviceAudioError = 'Could not read local audio. Allow media permission and tap Refresh.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _deviceAudioLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _playLocalSong(SongModel song) async {
+    final uriString = song.uri;
+    if (uriString == null || uriString.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _startupError = 'Selected local file is unavailable.';
+      });
+      return;
+    }
+
+    final localTrack = _demoTrackFromLocalSong(song);
+    final source = AudioSource.uri(
+      Uri.parse(uriString),
+      tag: MediaItem(
+        id: localTrack.id,
+        title: localTrack.title,
+        artist: localTrack.artist,
+        artUri: Uri.parse(_fallbackArtUrl),
+      ),
+    );
+
+    try {
+      if (mounted) {
+        setState(() {
+          _loadingSource = true;
+          _startupError = null;
+        });
+      }
+
+      await _player.setAudioSource(source).timeout(const Duration(seconds: 20));
+      await _player.play();
+
+      if (!mounted) return;
+      setState(() {
+        _queue = [localTrack];
+        _trackIndex = 0;
+        _audioReady = true;
+        _loadingSource = false;
+      });
+      await _persistUiState();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _startupError = 'Could not play local audio file.';
+        _loadingSource = false;
+      });
+    }
+  }
+
+  Future<void> _searchOnlineTracks(String query) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _discoverRemoteTracks.clear();
+        _discoverSearchError = null;
+        _discoverSearching = false;
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _discoverSearching = true;
+        _discoverSearchError = null;
+      });
+    }
+
+    try {
+      final uri = Uri.https('itunes.apple.com', '/search', {
+        'term': normalized,
+        'entity': 'song',
+        'limit': '25',
+      });
+
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw Exception('Search failed');
+      }
+
+      final decoded = jsonDecode(response.body);
+      final results = decoded is Map<String, dynamic> && decoded['results'] is List
+          ? decoded['results'] as List
+          : const <dynamic>[];
+
+      final parsed = <DemoTrack>[];
+      for (final entry in results) {
+        if (entry is! Map<String, dynamic>) continue;
+        final previewUrl = entry['previewUrl']?.toString();
+        final title = entry['trackName']?.toString();
+        if (previewUrl == null || title == null || title.trim().isEmpty) continue;
+        final artist = entry['artistName']?.toString() ?? 'Unknown Artist';
+        final art = entry['artworkUrl100']?.toString() ?? _fallbackArtUrl;
+        final trackId = entry['trackId']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString();
+
+        parsed.add(
+          DemoTrack(
+            id: 'it-$trackId',
+            title: title,
+            artist: artist,
+            audioUrl: previewUrl,
+            artUrl: art,
+            lyrics: 'Online preview track.',
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _discoverRemoteTracks
+          ..clear()
+          ..addAll(parsed);
+        _discoverSearchError = parsed.isEmpty ? 'No online results for this search.' : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _discoverSearchError = 'Online search failed. Check network and try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _discoverSearching = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _playOrQueueTrack(DemoTrack track, {int? queueIndex}) async {
+    if (queueIndex != null) {
+      await _playTrackInQueue(queueIndex);
+      return;
+    }
+
+    final existingIndex = _queue.indexWhere((item) => item.id == track.id);
+    if (existingIndex >= 0) {
+      await _playTrackInQueue(existingIndex);
+      return;
+    }
+
+    _queue = [..._queue, track];
+    await _persistUiState();
+    await _loadQueue(initialIndex: _queue.length - 1, autoPlay: true);
   }
 
   DemoTrack get _currentTrack => _queue[_trackIndex.clamp(0, _queue.length - 1)];
@@ -641,6 +855,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     if (addToRecent && normalized.isNotEmpty) {
       _persistUiState();
     }
+    unawaited(_searchOnlineTracks(normalized));
   }
 
   List<String> _discoverSuggestions(String query) {
@@ -866,7 +1081,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Widget _buildDiscoverPage() {
     final normalized = _discoverQuery.trim().toLowerCase();
-    final filteredTracks = normalized.isEmpty
+    final localFilteredTracks = normalized.isEmpty
         ? allTracks
         : allTracks
             .where(
@@ -875,6 +1090,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                   track.artist.toLowerCase().contains(normalized),
             )
             .toList();
+
+    final filteredTracks = normalized.isNotEmpty && _discoverRemoteTracks.isNotEmpty
+      ? _discoverRemoteTracks
+      : localFilteredTracks;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
@@ -953,6 +1172,25 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               .toList(),
         ),
         const SizedBox(height: 18),
+        if (_discoverSearching)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                Text('Searching online tracks...'),
+              ],
+            ),
+          ),
+        if (_discoverSearchError != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              _discoverSearchError!,
+              style: const TextStyle(color: Color(0xFFFFB4B4), fontSize: 12),
+            ),
+          ),
         if (_discoverQuery.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -999,7 +1237,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           ...filteredTracks.asMap().entries.map(
                 (entry) => _trackRow(
                   track: entry.value,
-                  index: _queue.indexWhere((item) => item.id == entry.value.id).clamp(0, _queue.length - 1),
+                  queueIndex: _queue.indexWhere((item) => item.id == entry.value.id),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1116,9 +1354,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         Text(activePlaylist.name, style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         ...activePlaylist.tracks.asMap().entries.map((entry) {
+          final queueIndex = _queue.indexWhere((item) => item.id == entry.value.id);
           return _trackRow(
             track: entry.value,
-            index: entry.key,
+            queueIndex: queueIndex,
+            onTap: () => _playFromPlaylist(activePlaylist, entry.key),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1151,12 +1391,53 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           ..._downloadedTracks.asMap().entries.map(
                 (entry) => _trackRow(
                   track: entry.value,
-                  index: _queue.indexWhere((item) => item.id == entry.value.id).clamp(0, _queue.length - 1),
+                  queueIndex: _queue.indexWhere((item) => item.id == entry.value.id),
                   trailing: IconButton(
                     onPressed: () => _toggleOffline(entry.value),
                     icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFC3D2F5)),
                   ),
                   subtitleSuffix: 'Offline',
+                ),
+              ),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Device Audio Files', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
+            TextButton.icon(
+              onPressed: _loadDeviceAudio,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Refresh'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_deviceAudioLoading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                Text('Scanning local music files...'),
+              ],
+            ),
+          )
+        else if (_deviceAudioError != null)
+          Text(_deviceAudioError!, style: const TextStyle(color: Color(0xFFFFB4B4)))
+        else if (_deviceSongs.isEmpty)
+          const Text(
+            'No local audio files found on this device yet.',
+            style: TextStyle(color: Color(0xFFB7C7EB)),
+          )
+        else
+          ..._deviceSongs.take(25).map(
+                (song) => _trackRow(
+                  track: _demoTrackFromLocalSong(song),
+                  queueIndex: _queue.indexWhere((item) => item.id == 'local-${song.id}'),
+                  onTap: () => _playLocalSong(song),
+                  trailing: const Icon(Icons.folder_rounded, color: Color(0xFFC3D2F5)),
+                  subtitleSuffix: 'Local file',
                 ),
               ),
       ],
@@ -1376,7 +1657,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                   margin: const EdgeInsets.only(bottom: 10),
                   child: _trackRow(
                     track: track,
-                    index: index,
+                    queueIndex: index,
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1409,11 +1690,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Widget _trackRow({
     required DemoTrack track,
-    required int index,
+    required int queueIndex,
     required Widget trailing,
     String? subtitleSuffix,
+    VoidCallback? onTap,
   }) {
-    final isCurrent = index == _trackIndex && _queue[index].id == _currentTrack.id;
+    final isTrackInQueue = queueIndex >= 0 && queueIndex < _queue.length;
+    final isCurrent = isTrackInQueue && queueIndex == _trackIndex && _queue[queueIndex].id == _currentTrack.id;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -1422,7 +1705,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         border: Border.all(color: isCurrent ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF)),
       ),
       child: ListTile(
-        onTap: () => _playTrackInQueue(index),
+        onTap: onTap ?? () => _playOrQueueTrack(track, queueIndex: isTrackInQueue ? queueIndex : null),
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(12),
