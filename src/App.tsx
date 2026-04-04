@@ -15,6 +15,7 @@ import { MyMusicPage } from '@/pages/MyMusicPage';
 import { NowPlayingPage } from '@/pages/NowPlayingPage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
 import { DownloadsPage } from '@/pages/DownloadsPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { useFavorites } from '@/hooks/useStorage';
 
 function PlayerWrapper() {
@@ -181,6 +182,7 @@ function PlayerWrapper() {
         <Route path="/now-playing" element={<NowPlayingPage />} />
         <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/downloads" element={<DownloadsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Routes>
 
       {/* PWA Install Prompt */}

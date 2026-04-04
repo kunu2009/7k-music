@@ -151,6 +151,8 @@ export interface YTPlayer {
   getDuration: () => number;
   getVolume: () => number;
   setVolume: (volume: number) => void;
+  setPlaybackQuality: (suggestedQuality: 'small' | 'medium' | 'large' | 'hd720' | 'hd1080' | 'highres' | 'default') => void;
+  getPlaybackQuality: () => string;
   mute: () => void;
   unMute: () => void;
   isMuted: () => boolean;

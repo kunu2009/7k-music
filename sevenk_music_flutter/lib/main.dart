@@ -352,30 +352,36 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       return;
     }
 
+    final safeIndex = initialIndex.clamp(0, _queue.length - 1);
+    final targetTrack = _queue[safeIndex];
+
+    if (_isYoutubeTrack(targetTrack)) {
+      setState(() {
+        _trackIndex = safeIndex;
+        _loadingSource = false;
+        _audioReady = false;
+      });
+      await _loadYoutubeTrack(targetTrack, autoplay: autoPlay);
+      return;
+    }
+
     setState(() {
       _loadingSource = true;
       _startupError = null;
     });
 
     try {
-      final sources = _queue
-          .map(
-            (track) => AudioSource.uri(
-              Uri.parse(track.audioUrl),
-              tag: MediaItem(
-                id: track.id,
-                title: track.title,
-                artist: track.artist,
-                artUri: Uri.parse(track.artUrl),
-              ),
-            ),
-          )
-          .toList();
+      final source = AudioSource.uri(
+        Uri.parse(targetTrack.audioUrl),
+        tag: MediaItem(
+          id: targetTrack.id,
+          title: targetTrack.title,
+          artist: targetTrack.artist,
+          artUri: Uri.parse(targetTrack.artUrl),
+        ),
+      );
 
-      // Use longer timeout on older devices (30s instead of 15s)
-      await _player
-          .setAudioSources(sources, initialIndex: initialIndex)
-          .timeout(const Duration(seconds: 30));
+      await _player.setAudioSource(source).timeout(const Duration(seconds: 30));
       _audioReady = true;
       if (autoPlay) {
         await _player.play();
@@ -391,7 +397,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     } finally {
       if (mounted) {
         setState(() {
-          _trackIndex = initialIndex;
+          _activeYouTubeVideoId = null;
+          _trackIndex = safeIndex;
           _loadingSource = false;
         });
       }
@@ -426,30 +433,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Future<void> _nextTrackSafe() async {
     if (_queue.isEmpty) return;
-    if (_isYoutubeTrack(_currentTrack)) {
-      final nextIndex = (_trackIndex + 1).clamp(0, _queue.length - 1);
-      await _playTrackInQueue(nextIndex);
-      return;
-    }
-    if (!_audioReady) {
-      await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
-      return;
-    }
-    await _player.seekToNext();
+    final nextIndex = (_trackIndex + 1).clamp(0, _queue.length - 1);
+    await _playTrackInQueue(nextIndex);
   }
 
   Future<void> _previousTrackSafe() async {
     if (_queue.isEmpty) return;
-    if (_isYoutubeTrack(_currentTrack)) {
-      final previousIndex = (_trackIndex - 1).clamp(0, _queue.length - 1);
-      await _playTrackInQueue(previousIndex);
-      return;
-    }
-    if (!_audioReady) {
-      await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
-      return;
-    }
-    await _player.seekToPrevious();
+    final previousIndex = (_trackIndex - 1).clamp(0, _queue.length - 1);
+    await _playTrackInQueue(previousIndex);
   }
 
   DemoTrack _demoTrackFromLocalSong(SongModel song) {
@@ -464,30 +455,19 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   bool _isLikelyMusicSong(SongModel song) {
-    final title = song.title.toLowerCase();
-    final artist = (song.artist ?? '').toLowerCase();
-    final combined = '$title $artist';
+    final data = (song.data).toLowerCase();
     const blocked = [
-      'alarm',
-      'ringtone',
-      'notification',
-      'tone',
-      'ui ',
-      'sound',
-      'clock',
-      'boot',
-      'system',
-      'whatsapp',
-      'message',
-      'call',
+      '/alarms/',
+      '/notifications/',
+      '/ringtones/',
     ];
 
-    if ((song.duration ?? 0) < 30000) {
+    if ((song.duration ?? 0) < 5000) {
       return false;
     }
 
     for (final term in blocked) {
-      if (combined.contains(term)) return false;
+      if (data.contains(term)) return false;
     }
 
     return true;
@@ -497,11 +477,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     return track.youtubeVideoId != null && track.youtubeVideoId!.isNotEmpty;
   }
 
-  Uri _youtubeEmbedUri(String videoId) {
-    return Uri.parse('https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&controls=1&rel=0&modestbranding=1');
+  Uri _youtubeEmbedUri(String videoId, {required bool autoplay}) {
+    return Uri.parse(
+      'https://www.youtube.com/embed/$videoId?autoplay=${autoplay ? 1 : 0}&playsinline=1&controls=1&rel=0&modestbranding=1&enablejsapi=1&origin=https://music.7kc.me',
+    );
   }
 
-  Future<void> _loadYoutubeTrack(DemoTrack track) async {
+  Future<void> _loadYoutubeTrack(DemoTrack track, {bool autoplay = true}) async {
     final videoId = track.youtubeVideoId;
     if (videoId == null || videoId.isEmpty) return;
 
@@ -515,7 +497,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       });
     }
 
-    await _youtubeController.loadRequest(_youtubeEmbedUri(videoId));
+    await _youtubeController.loadRequest(_youtubeEmbedUri(videoId, autoplay: autoplay));
     _pageController.jumpToPage(2);
     await _persistUiState();
   }
@@ -544,11 +526,21 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         ignoreCase: true,
       );
 
+      final seenUris = <String>{};
+      final uniqueSongs = <SongModel>[];
+      for (final song in songs) {
+        final uri = song.uri;
+        if (uri == null || uri.isEmpty) continue;
+        if (seenUris.contains(uri)) continue;
+        seenUris.add(uri);
+        uniqueSongs.add(song);
+      }
+
       if (!mounted) return;
       setState(() {
         _deviceSongs
           ..clear()
-          ..addAll(songs.where((song) => song.uri != null && song.duration != null && _isLikelyMusicSong(song)));
+          ..addAll(uniqueSongs.where((song) => song.duration != null && _isLikelyMusicSong(song)));
       });
     } catch (_) {
       if (!mounted) return;
@@ -605,10 +597,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _loadingSource = false;
       });
       await _persistUiState();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _startupError = 'Could not play local audio file.';
+        _startupError = 'Could not play local audio file: $error';
         _loadingSource = false;
       });
     }
@@ -2227,6 +2219,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }) {
     final isTrackInQueue = queueIndex >= 0 && queueIndex < _queue.length;
     final isCurrent = isTrackInQueue && queueIndex == _trackIndex && _queue[queueIndex].id == _currentTrack.id;
+    final isLocalTrack = track.id.startsWith('local-');
+    final localId = isLocalTrack ? int.tryParse(track.id.replaceFirst('local-', '')) : null;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -2239,7 +2233,29 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(track.artUrl, width: 54, height: 54, fit: BoxFit.cover),
+          child: isLocalTrack && localId != null
+              ? QueryArtworkWidget(
+                  id: localId,
+                  type: ArtworkType.AUDIO,
+                  nullArtworkWidget: Container(
+                    width: 54,
+                    height: 54,
+                    color: const Color(0x2A203869),
+                    child: const Icon(Icons.music_note_rounded, color: Color(0xFFC3D2F5)),
+                  ),
+                )
+              : Image.network(
+                  track.artUrl,
+                  width: 54,
+                  height: 54,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 54,
+                    height: 54,
+                    color: const Color(0x2A203869),
+                    child: const Icon(Icons.music_note_rounded, color: Color(0xFFC3D2F5)),
+                  ),
+                ),
         ),
         title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text(

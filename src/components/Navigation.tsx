@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Search, Heart, Library, Sparkles, Radio, Smartphone } from 'lucide-react';
+import { Home, Search, Heart, Library, Sparkles, Radio, Smartphone, Settings } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
   const navItems = [
@@ -10,6 +10,7 @@ export const Navigation: React.FC = () => {
     { to: '/categories', icon: Sparkles, label: 'Categories' },
     { to: '/downloads', icon: Smartphone, label: 'Downloads' },
     { to: '/favorites', icon: Heart, label: 'Favorites' },
+    { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
   return (

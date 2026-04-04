@@ -18,6 +18,30 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
   const playerRef = useRef<YTPlayer | null>(null);
   const intervalRef = useRef<number | null>(null);
 
+  const getPreferredQuality = useCallback(() => {
+    const savedQuality = localStorage.getItem('player.videoQuality') || 'auto';
+    const dataSaver = localStorage.getItem('player.dataSaver') === 'true';
+
+    if (savedQuality !== 'auto') {
+      return savedQuality as 'small' | 'medium' | 'large' | 'hd720' | 'hd1080' | 'highres' | 'default';
+    }
+
+    if (dataSaver) {
+      return 'small' as const;
+    }
+
+    return 'default' as const;
+  }, []);
+
+  const applyPlaybackQuality = useCallback(() => {
+    if (!playerRef.current) return;
+    try {
+      playerRef.current.setPlaybackQuality(getPreferredQuality());
+    } catch (error) {
+      console.warn('Could not apply playback quality:', error);
+    }
+  }, [getPreferredQuality]);
+
   // Load YouTube IFrame API
   useEffect(() => {
     // Check if API is already loaded
@@ -98,6 +122,7 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
             setErrorCode(null);
             setPlayer(event.target);
             playerRef.current = event.target;
+            applyPlaybackQuality();
           },
           onStateChange: (event) => {
             const state = event.data;
@@ -107,6 +132,7 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
               setIsPlaying(true);
               setStatus('playing');
               setDuration(event.target.getDuration());
+              applyPlaybackQuality();
               startProgressTracking();
             } else if (state === 2) {
               setIsPlaying(false);
@@ -223,13 +249,16 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
         } else {
           playerRef.current.cueVideoById(video.id);
         }
+        window.setTimeout(() => {
+          applyPlaybackQuality();
+        }, 400);
       } catch (error) {
         console.error('Error loading video:', error);
       }
     } else {
       console.warn('⚠️ Player not initialized yet, video ID:', video.id);
     }
-  }, [isReady]);
+  }, [isReady, applyPlaybackQuality]);
 
   const seekTo = useCallback((seconds: number) => {
     if (playerRef.current) {
