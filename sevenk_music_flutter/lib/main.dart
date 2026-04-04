@@ -455,14 +455,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   bool _isLikelyMusicSong(SongModel song) {
-    final data = (song.data).toLowerCase();
+    final data = _safeSongData(song).toLowerCase();
     const blocked = [
       '/alarms/',
       '/notifications/',
       '/ringtones/',
     ];
 
-    if ((song.duration ?? 0) < 5000) {
+    if (_safeSongDuration(song) < 1000) {
       return false;
     }
 
@@ -471,6 +471,32 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     return true;
+  }
+
+  String _safeSongData(SongModel song) {
+    try {
+      return song.data;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _safeSongUri(SongModel song) {
+    try {
+      final uri = song.uri;
+      if (uri != null && uri.isNotEmpty) return uri;
+    } catch (_) {
+      // Fallback to data path below.
+    }
+    return _safeSongData(song);
+  }
+
+  int _safeSongDuration(SongModel song) {
+    try {
+      return song.duration ?? 0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   bool _isYoutubeTrack(DemoTrack track) {
@@ -529,8 +555,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       final seenUris = <String>{};
       final uniqueSongs = <SongModel>[];
       for (final song in songs) {
-        final uri = song.uri;
-        if (uri == null || uri.isEmpty) continue;
+        final uri = _safeSongUri(song);
+        if (uri.isEmpty) continue;
         if (seenUris.contains(uri)) continue;
         seenUris.add(uri);
         uniqueSongs.add(song);
@@ -540,7 +566,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       setState(() {
         _deviceSongs
           ..clear()
-          ..addAll(uniqueSongs.where((song) => song.duration != null && _isLikelyMusicSong(song)));
+          ..addAll(uniqueSongs.where(_isLikelyMusicSong));
       });
     } catch (_) {
       if (!mounted) return;
@@ -557,8 +583,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _playLocalSong(SongModel song) async {
-    final uriString = song.uri;
-    if (uriString == null || uriString.isEmpty) {
+    final uriString = _safeSongUri(song);
+    if (uriString.isEmpty) {
       if (!mounted) return;
       setState(() {
         _startupError = 'Selected local file is unavailable.';
@@ -600,7 +626,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _startupError = 'Could not play local audio file: $error';
+        _startupError = 'Could not play local audio file: ${error.runtimeType}';
         _loadingSource = false;
       });
     }
@@ -626,15 +652,28 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     try {
-      // Call secure backend endpoint on custom domain (uses VITE_YOUTUBE_API_KEY env var from Vercel)
-      final uri = Uri.https('music.7kc.me', '/api/search', {
-        'q': normalized,
-        'maxResults': '25',
-      });
+      final candidates = <Uri>[
+        Uri.https('music.7kc.me', '/api/search', {'q': normalized, 'maxResults': '25'}),
+        Uri.https('7k-music-7f6u.vercel.app', '/api/search', {'q': normalized, 'maxResults': '25'}),
+      ];
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (response.statusCode != 200) {
-        throw Exception('Search API failed: ${response.statusCode}');
+      http.Response? response;
+      Object? lastError;
+      for (final uri in candidates) {
+        try {
+          final next = await http.get(uri).timeout(const Duration(seconds: 15));
+          if (next.statusCode == 200) {
+            response = next;
+            break;
+          }
+          lastError = Exception('Search API failed: ${next.statusCode}');
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (response == null) {
+        throw lastError ?? Exception('Search API failed');
       }
 
       final decoded = jsonDecode(response.body);
@@ -1706,7 +1745,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                       style: TextStyle(color: Color(0xFFB7C7EB)),
                     )
                   else
-                    ..._deviceSongs.take(25).map(
+                    ..._deviceSongs.map(
                           (song) => _trackRow(
                             track: _demoTrackFromLocalSong(song),
                             queueIndex: _queue.indexWhere((item) => item.id == 'local-${song.id}'),
