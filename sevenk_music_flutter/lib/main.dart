@@ -42,6 +42,26 @@ class DemoTrack {
   final String audioUrl;
   final String artUrl;
   final String lyrics;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'artist': artist,
+        'audioUrl': audioUrl,
+        'artUrl': artUrl,
+        'lyrics': lyrics,
+      };
+
+  factory DemoTrack.fromJson(Map<String, dynamic> json) {
+    return DemoTrack(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Unknown Track',
+      artist: json['artist']?.toString() ?? 'Unknown Artist',
+      audioUrl: json['audioUrl']?.toString() ?? '',
+      artUrl: json['artUrl']?.toString() ?? _fallbackArtUrl,
+      lyrics: json['lyrics']?.toString() ?? '',
+    );
+  }
 }
 
 class DemoPlaylist {
@@ -58,77 +78,59 @@ class DemoPlaylist {
   final List<DemoTrack> tracks;
 }
 
-const allTracks = <DemoTrack>[
-  DemoTrack(
-    id: '1',
-    title: 'Neon Horizon',
-    artist: '7K Session',
-    audioUrl: 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3',
-    artUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600',
-    lyrics:
-        'Neon lights in midnight rain\nHold me close in purple haze\nEvery heartbeat feels alive\nWe are echoes in the sky',
-  ),
-  DemoTrack(
-    id: '2',
-    title: 'Night Pulse',
-    artist: '7K Session',
-    audioUrl: 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Temple-of-God.mp3',
-    artUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600',
-    lyrics:
-        'City drums are calling out\nCrowded rooms and flashing sounds\nStay with me until sunrise\nFeel the rush behind our eyes',
-  ),
-  DemoTrack(
-    id: '3',
-    title: 'Blue Drift',
-    artist: '7K Session',
-    audioUrl: 'https://samplelib.com/lib/preview/mp3/sample-12s.mp3',
-    artUrl: 'https://images.unsplash.com/photo-1501612780327-45045538702b?w=600',
-    lyrics:
-        'Falling slow through open air\nSilver dust is everywhere\nBlue horizon, quiet glow\nTake me where the wild winds go',
-  ),
-  DemoTrack(
-    id: '4',
-    title: 'Electric Bloom',
-    artist: 'Afterline',
-    audioUrl: 'https://samplelib.com/lib/preview/mp3/sample-15s.mp3',
-    artUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600',
-    lyrics:
-        'Static flowers in the dark\nTiny sparks become a fire\nTouch the rhythm, touch the wire\nRise with me and climb higher',
-  ),
-  DemoTrack(
-    id: '5',
-    title: 'Afterglow Drive',
-    artist: 'Nova Miles',
-    audioUrl: 'https://samplelib.com/lib/preview/mp3/sample-9s.mp3',
-    artUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600',
-    lyrics:
-        'Highway lines and amber skies\nRadio sparks in your eyes\nRoll the windows, breathe the night\nKeep the afterglow in sight',
-  ),
-];
-
 const String _fallbackArtUrl =
   'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600';
 
-final demoPlaylists = <DemoPlaylist>[
-  DemoPlaylist(
-    id: 'pl-1',
-    name: 'Night Ride',
-    description: 'Cinematic synth for late drives',
-    tracks: [allTracks[0], allTracks[4], allTracks[1]],
-  ),
-  DemoPlaylist(
-    id: 'pl-2',
-    name: 'Focus Waves',
-    description: 'Low-distraction atmosphere',
-    tracks: [allTracks[2], allTracks[0], allTracks[3]],
-  ),
-  DemoPlaylist(
-    id: 'pl-3',
-    name: 'Live Energy',
-    description: 'Bigger drums, bigger choruses',
-    tracks: [allTracks[3], allTracks[1], allTracks[4]],
-  ),
-];
+const DemoTrack _emptyTrack = DemoTrack(
+  id: 'empty',
+  title: 'No track selected',
+  artist: '7K Music',
+  audioUrl: '',
+  artUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600',
+  lyrics: 'Search YouTube or open local files to start playing.',
+);
+
+final demoPlaylists = <DemoPlaylist>[];
+
+final ValueNotifier<int> themePresetNotifier = ValueNotifier<int>(0);
+
+ThemeData buildAppTheme(int preset) {
+  switch (preset) {
+    case 1:
+      return ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF071A16),
+        textTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF76E7C4),
+          secondary: Color(0xFF9DFFD7),
+          surface: Color(0xFF102B25),
+        ),
+      );
+    case 2:
+      return ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF201109),
+        textTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFFFB36B),
+          secondary: Color(0xFFFFD2A1),
+          surface: Color(0xFF2D1A10),
+        ),
+      );
+    default:
+      return ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF050814),
+        textTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF8AAFFF),
+          secondary: Color(0xFFA9BFFF),
+          surface: Color(0xFF111A33),
+        ),
+      );
+  }
+}
 
 class RoyaltyFreeService {
   final String name;
@@ -210,20 +212,16 @@ class SevenKMusicApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: '7K Music Player',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF050814),
-        textTheme: GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF8AAFFF),
-          secondary: Color(0xFFA9BFFF),
-          surface: Color(0xFF111A33),
-        ),
-      ),
-      home: const SevenKMusicShell(),
+    return ValueListenableBuilder<int>(
+      valueListenable: themePresetNotifier,
+      builder: (context, preset, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: '7K Music Player',
+          theme: buildAppTheme(preset),
+          home: const SevenKMusicShell(),
+        );
+      },
     );
   }
 }
@@ -239,19 +237,24 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   late final AudioPlayer _player;
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final TextEditingController _discoverSearchController = TextEditingController();
+  late final PageController _pageController;
 
   static const String _prefsCurrentTabKey = 'sevenk.currentTab.v1';
   static const String _prefsActivePlaylistKey = 'sevenk.activePlaylist.v1';
   static const String _prefsQueueOrderKey = 'sevenk.queueOrder.v1';
   static const String _prefsRecentSearchesKey = 'sevenk.recentSearches.v1';
   static const String _prefsDownloadedTracksKey = 'sevenk.downloadedTrackIds.v1';
+  static const String _prefsDownloadedTrackDataKey = 'sevenk.downloadedTrackData.v1';
   static const String _prefsPlaylistsKey = 'sevenk.playlists.v1';
   static const String _prefsLibraryTabKey = 'sevenk.libraryTab.v1';
+  static const String _prefsThemePresetKey = 'sevenk.themePreset.v1';
+  static const String _prefsLikedTracksKey = 'sevenk.likedTracks.v1';
 
   int _currentTab = 0;
   int _libraryTabIndex = 0; // 0 = Playlists, 1 = Downloads, 2 = Royalty-Free
+  int _themePreset = 0;
   int _trackIndex = 0;
-  List<DemoTrack> _queue = List.of(allTracks);
+  List<DemoTrack> _queue = <DemoTrack>[];
   String? _activePlaylistId;
   String _discoverQuery = '';
   String? _discoverSearchError;
@@ -260,6 +263,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   final List<DemoTrack> _discoverRemoteTracks = <DemoTrack>[];
   final List<SongModel> _deviceSongs = <SongModel>[];
   final Set<String> _downloadedTrackIds = <String>{};
+  final Map<String, DemoTrack> _downloadedTrackCache = <String, DemoTrack>{};
+  final Set<String> _likedTrackIds = <String>{};
+  final Map<String, DemoTrack> _likedTrackCache = <String, DemoTrack>{};
   final Map<String, List<DemoTrack>> _playlistTracks = {
     for (final playlist in demoPlaylists) playlist.id: List<DemoTrack>.of(playlist.tracks),
   };
@@ -278,6 +284,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: _currentTab);
     _player = AudioPlayer();
     _init();
   }
@@ -289,6 +296,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
       _prefs = await SharedPreferences.getInstance();
       await _restoreUiState();
+      themePresetNotifier.value = _themePreset;
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(_currentTab);
+      }
 
       await _loadQueue(initialIndex: 0, autoPlay: false);
       unawaited(_loadDeviceAudio());
@@ -319,6 +330,17 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _loadQueue({required int initialIndex, required bool autoPlay}) async {
+    if (_queue.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _audioReady = false;
+          _loadingSource = false;
+          _startupError = null;
+        });
+      }
+      return;
+    }
+
     setState(() {
       _loadingSource = true;
       _startupError = null;
@@ -366,6 +388,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _ensureQueueReadyAndPlay() async {
+    if (_queue.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Search for a song or open a local file first.')));
+      return;
+    }
+
     if (_audioReady) {
       if (_player.playing) {
         await _player.pause();
@@ -379,6 +409,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _nextTrackSafe() async {
+    if (_queue.isEmpty) return;
     if (!_audioReady) {
       await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
       return;
@@ -387,6 +418,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _previousTrackSafe() async {
+    if (_queue.isEmpty) return;
     if (!_audioReady) {
       await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
       return;
@@ -522,7 +554,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       final uri = Uri.https('music.7kc.me', '/api/search', {
         'q': normalized,
         'maxResults': '25',
-      });}
+      });
 
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
@@ -596,10 +628,15 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     await _loadQueue(initialIndex: _queue.length - 1, autoPlay: true);
   }
 
-  DemoTrack get _currentTrack => _queue[_trackIndex.clamp(0, _queue.length - 1)];
+  DemoTrack get _currentTrack => _queue.isEmpty ? _emptyTrack : _queue[_trackIndex.clamp(0, _queue.length - 1)];
 
   DemoTrack? _trackFromId(String id) {
-    for (final track in allTracks) {
+    for (final track in [
+      ..._queue,
+      ..._discoverRemoteTracks,
+      ..._likedTrackCache.values,
+      ..._downloadedTrackCache.values,
+    ]) {
       if (track.id == id) return track;
     }
     return null;
@@ -683,7 +720,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
     setState(() {
       final savedTab = prefs.getInt(_prefsCurrentTabKey) ?? 0;
-      _currentTab = savedTab.clamp(0, 3);
+      _currentTab = savedTab.clamp(0, 4);
 
       final savedLibraryTab = prefs.getInt(_prefsLibraryTabKey) ?? 0;
       _libraryTabIndex = savedLibraryTab.clamp(0, 2);
@@ -697,6 +734,47 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       _downloadedTrackIds
         ..clear()
         ..addAll(downloadedIds);
+
+      final rawDownloadedTracks = prefs.getString(_prefsDownloadedTrackDataKey);
+      if (rawDownloadedTracks != null && rawDownloadedTracks.isNotEmpty) {
+        try {
+          final decodedDownloaded = jsonDecode(rawDownloadedTracks);
+          if (decodedDownloaded is List) {
+            _downloadedTrackCache.clear();
+            for (final entry in decodedDownloaded.whereType<Map>()) {
+              final track = DemoTrack.fromJson(entry.map((key, value) => MapEntry(key.toString(), value)));
+              if (track.id.isNotEmpty) {
+                _downloadedTrackCache[track.id] = track;
+              }
+            }
+          }
+        } catch (_) {
+          // Ignore malformed offline cache.
+        }
+      }
+
+      final savedThemePreset = int.tryParse(prefs.getString(_prefsThemePresetKey) ?? '0') ?? 0;
+      _themePreset = savedThemePreset.clamp(0, 2);
+
+      final rawLiked = prefs.getString(_prefsLikedTracksKey);
+      if (rawLiked != null && rawLiked.isNotEmpty) {
+        try {
+          final decodedLiked = jsonDecode(rawLiked);
+          if (decodedLiked is List) {
+            _likedTrackIds.clear();
+            _likedTrackCache.clear();
+            for (final entry in decodedLiked.whereType<Map>()) {
+              final track = DemoTrack.fromJson(entry.map((key, value) => MapEntry(key.toString(), value)));
+              if (track.id.isNotEmpty) {
+                _likedTrackIds.add(track.id);
+                _likedTrackCache[track.id] = track;
+              }
+            }
+          }
+        } catch (_) {
+          // Ignore malformed liked-track cache.
+        }
+      }
 
       _activePlaylistId = prefs.getString(_prefsActivePlaylistKey);
 
@@ -714,9 +792,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         }
       }
 
-      if (_queue.isEmpty) {
-        _queue = List<DemoTrack>.of(allTracks);
-      }
+      themePresetNotifier.value = _themePreset;
     });
   }
 
@@ -734,7 +810,96 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     await prefs.setStringList(_prefsQueueOrderKey, _queue.map((track) => track.id).toList());
     await prefs.setStringList(_prefsRecentSearchesKey, _recentDiscoverSearches);
     await prefs.setStringList(_prefsDownloadedTracksKey, _downloadedTrackIds.toList());
+    await prefs.setString(
+      _prefsDownloadedTrackDataKey,
+      jsonEncode(
+        _downloadedTrackIds
+            .map((id) => _downloadedTrackCache[id]?.toJson())
+            .whereType<Map<String, dynamic>>()
+            .toList(),
+      ),
+    );
+    await prefs.setString(_prefsThemePresetKey, _themePreset.toString());
+    await prefs.setString(
+      _prefsLikedTracksKey,
+      jsonEncode(
+        _likedTrackIds.map((id) => _likedTrackCache[id]?.toJson()).whereType<Map<String, dynamic>>().toList(),
+      ),
+    );
     await _persistPlaylists();
+  }
+
+  List<DemoTrack> get _likedTracks =>
+      _likedTrackIds.map((id) => _likedTrackCache[id]).whereType<DemoTrack>().toList();
+
+  Future<void> _toggleLikedTrack(DemoTrack track) async {
+    setState(() {
+      if (_likedTrackIds.contains(track.id)) {
+        _likedTrackIds.remove(track.id);
+        _likedTrackCache.remove(track.id);
+      } else {
+        _likedTrackIds.add(track.id);
+        _likedTrackCache[track.id] = track;
+      }
+    });
+    await _persistUiState();
+  }
+
+  Future<void> _setThemePreset(int preset) async {
+    setState(() {
+      _themePreset = preset.clamp(0, 2);
+    });
+    themePresetNotifier.value = _themePreset;
+    await _persistUiState();
+  }
+
+  Future<void> _openExpandedPlayer() async {
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.94,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF0A1026),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 54,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB7C7EB).withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Expanded Player', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w700)),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0x2FAFC2FF)),
+                Expanded(child: _buildNowPlayingPage()),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _renamePlaylist(DemoPlaylist playlist) async {
@@ -846,7 +1011,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   List<DemoTrack> get _downloadedTracks {
-    return allTracks.where((track) => _downloadedTrackIds.contains(track.id)).toList();
+    return _downloadedTrackIds.map((id) => _downloadedTrackCache[id]).whereType<DemoTrack>().toList();
   }
 
   Future<void> _playTrackInQueue(int index) async {
@@ -945,9 +1110,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     final normalized = query.trim().toLowerCase();
     final source = <String>[
       ..._recentDiscoverSearches,
-      ...demoPlaylists.map((playlist) => playlist.name),
-      ...allTracks.map((track) => track.title),
-      ...allTracks.map((track) => track.artist),
+      'lofi hip hop',
+      'chill beats',
+      'focus music',
+      'study mix',
+      'rain sounds',
       'Night drive',
       'Focus mix',
       'Workout energy',
@@ -1112,8 +1279,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     setState(() {
       if (_downloadedTrackIds.contains(track.id)) {
         _downloadedTrackIds.remove(track.id);
+        _downloadedTrackCache.remove(track.id);
       } else {
         _downloadedTrackIds.add(track.id);
+        _downloadedTrackCache[track.id] = track;
       }
     });
     _persistUiState();
@@ -1163,27 +1332,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Widget _buildDiscoverPage() {
-    final normalized = _discoverQuery.trim().toLowerCase();
-    final localFilteredTracks = normalized.isEmpty
-        ? allTracks
-        : allTracks
-            .where(
-              (track) =>
-                  track.title.toLowerCase().contains(normalized) ||
-                  track.artist.toLowerCase().contains(normalized),
-            )
-            .toList();
-
-    final filteredTracks = normalized.isNotEmpty && _discoverRemoteTracks.isNotEmpty
-      ? _discoverRemoteTracks
-      : localFilteredTracks;
+    final filteredTracks = _discoverRemoteTracks;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
       children: [
         Text('Discover', style: GoogleFonts.sora(fontSize: 34, fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
-        const Text('Curated for your daily listening sessions', style: TextStyle(color: Color(0xFFB7C7EB))),
+        const Text('Search YouTube for music or use local files from your device', style: TextStyle(color: Color(0xFFB7C7EB))),
         const SizedBox(height: 18),
         _heroCard(),
         const SizedBox(height: 16),
@@ -1282,37 +1438,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               style: const TextStyle(color: Color(0xFFB7C7EB), fontSize: 12),
             ),
           ),
-        Text('Trending Playlists', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        ...demoPlaylists.map((playlist) {
-          final art = playlist.tracks.first.artUrl;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: const Color(0x261A2B54),
-              border: Border.all(color: const Color(0x2FAFC2FF)),
-            ),
-            child: ListTile(
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(art, width: 52, height: 52, fit: BoxFit.cover),
-              ),
-              title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(playlist.description, maxLines: 1, overflow: TextOverflow.ellipsis),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-              onTap: () => _openPlaylistDetail(playlist),
-            ),
-          );
-        }),
-        const SizedBox(height: 26),
         Text('Top Songs', style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
         const SizedBox(height: 14),
         if (filteredTracks.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Text(
-              'No songs match your search yet.',
+              'No YouTube results yet. Try a different query.',
               style: TextStyle(color: Color(0xFFB7C7EB)),
             ),
           )
@@ -1327,6 +1459,17 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                       IconButton(
                         onPressed: () => _addToQueueNext(entry.value),
                         icon: const Icon(Icons.queue_music_rounded, color: Color(0xFFC3D2F5)),
+                      ),
+                      IconButton(
+                        onPressed: () => _toggleLikedTrack(entry.value),
+                        icon: Icon(
+                          _likedTrackIds.contains(entry.value.id)
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: _likedTrackIds.contains(entry.value.id)
+                              ? const Color(0xFFFF8FA3)
+                              : const Color(0xFFC3D2F5),
+                        ),
                       ),
                       IconButton(
                         onPressed: () => _toggleOffline(entry.value),
@@ -1347,13 +1490,6 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Widget _buildLibraryPage() {
-    final activePlaylist = _activePlaylistId == null
-        ? demoPlaylists.first
-        : demoPlaylists.firstWhere(
-            (item) => item.id == _activePlaylistId,
-            orElse: () => demoPlaylists.first,
-          );
-
     return Column(
       children: [
         Padding(
@@ -1399,99 +1535,37 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           child: IndexedStack(
             index: _libraryTabIndex,
             children: [
-              // Tab 0: Playlists
+              // Tab 0: Liked Songs
               ListView(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
                 children: [
-                  ReorderableListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: demoPlaylists.length,
-                    onReorder: _reorderLibraryPlaylists,
-                    itemBuilder: (context, index) {
-                      final playlist = demoPlaylists[index];
-                      final selected = playlist.id == activePlaylist.id;
-                      final tracks = _playlistTracks[playlist.id] ?? playlist.tracks;
-                      return Container(
-                        key: ValueKey('playlist-${playlist.id}'),
-                        margin: const EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          color: selected ? const Color(0x3A8AAFFF) : const Color(0x261A2B54),
-                          border: Border.all(color: selected ? const Color(0x7FAFD0FF) : const Color(0x2FAFC2FF)),
-                        ),
-                        child: ListTile(
-                          onTap: () => _openPlaylistDetail(playlist),
-                          title: Text(playlist.name),
-                          subtitle: Text('${tracks.length} tracks • ${playlist.description}'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.play_arrow_rounded),
-                                onPressed: () => _playFromPlaylist(playlist, 0),
-                              ),
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'rename') {
-                                    _renamePlaylist(playlist);
-                                  }
-                                  if (value == 'delete') {
-                                    _deletePlaylist(playlist);
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem<String>(
-                                    value: 'rename',
-                                    child: Text('Rename'),
-                                  ),
-                                  PopupMenuItem<String>(
-                                    value: 'delete',
-                                    child: Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                              ReorderableDragStartListener(
-                                index: index,
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 6),
-                                  child: Icon(Icons.drag_indicator_rounded, color: Color(0xFFC3D2F5)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  Text(activePlaylist.name, style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
+                  Text('Liked Songs', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
-                  ...activePlaylist.tracks.asMap().entries.map((entry) {
-                    final queueIndex = _queue.indexWhere((item) => item.id == entry.value.id);
-                    return _trackRow(
-                      track: entry.value,
-                      queueIndex: queueIndex,
-                      onTap: () => _playFromPlaylist(activePlaylist, entry.key),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: () => _addToQueue(entry.value),
-                            icon: const Icon(Icons.queue_music_rounded, color: Color(0xFFC3D2F5)),
-                          ),
-                          IconButton(
-                            onPressed: () => _toggleOffline(entry.value),
-                            icon: Icon(
-                              _downloadedTrackIds.contains(entry.value.id)
-                                  ? Icons.download_done_rounded
-                                  : Icons.download_for_offline_outlined,
-                              color: const Color(0xFFC3D2F5)),
+                  if (_likedTracks.isEmpty)
+                    const Text(
+                      'Tap the heart icon on any song to save it here.',
+                      style: TextStyle(color: Color(0xFFB7C7EB)),
+                    )
+                  else
+                    ..._likedTracks.map(
+                      (track) => _trackRow(
+                        track: track,
+                        queueIndex: _queue.indexWhere((item) => item.id == track.id),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: () => _addToQueue(track),
+                              icon: const Icon(Icons.queue_music_rounded, color: Color(0xFFC3D2F5)),
                             ),
-                        ],
+                            IconButton(
+                              onPressed: () => _toggleLikedTrack(track),
+                              icon: const Icon(Icons.favorite_rounded, color: Color(0xFFFF8FA3)),
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  }),
+                    ),
                 ],
               ),
               // Tab 1: Downloads (Local & Offline)
@@ -1532,7 +1606,23 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                             track: _demoTrackFromLocalSong(song),
                             queueIndex: _queue.indexWhere((item) => item.id == 'local-${song.id}'),
                             onTap: () => _playLocalSong(song),
-                            trailing: const Icon(Icons.folder_rounded, color: Color(0xFFC3D2F5)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed: () => _toggleLikedTrack(_demoTrackFromLocalSong(song)),
+                                  icon: Icon(
+                                    _likedTrackIds.contains('local-${song.id}')
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    color: _likedTrackIds.contains('local-${song.id}')
+                                        ? const Color(0xFFFF8FA3)
+                                        : const Color(0xFFC3D2F5),
+                                  ),
+                                ),
+                                const Icon(Icons.folder_rounded, color: Color(0xFFC3D2F5)),
+                              ],
+                            ),
                             subtitleSuffix: 'Local file',
                           ),
                         ),
@@ -1549,9 +1639,25 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                           (entry) => _trackRow(
                             track: entry.value,
                             queueIndex: _queue.indexWhere((item) => item.id == entry.value.id),
-                            trailing: IconButton(
-                              onPressed: () => _toggleOffline(entry.value),
-                              icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFC3D2F5)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  onPressed: () => _toggleLikedTrack(entry.value),
+                                  icon: Icon(
+                                    _likedTrackIds.contains(entry.value.id)
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    color: _likedTrackIds.contains(entry.value.id)
+                                        ? const Color(0xFFFF8FA3)
+                                        : const Color(0xFFC3D2F5),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () => _toggleOffline(entry.value),
+                                  icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFC3D2F5)),
+                                ),
+                              ],
                             ),
                             subtitleSuffix: 'Offline',
                           ),
@@ -1626,6 +1732,88 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingsPage() {
+    final themeOptions = <({String label, String subtitle, int value, Color accent})>[
+      (
+        label: 'Midnight',
+        subtitle: 'Classic blue 7K theme',
+        value: 0,
+        accent: const Color(0xFF8AAFFF),
+      ),
+      (
+        label: 'Aurora',
+        subtitle: 'Green glass palette',
+        value: 1,
+        accent: const Color(0xFF76E7C4),
+      ),
+      (
+        label: 'Ember',
+        subtitle: 'Warm sunset palette',
+        value: 2,
+        accent: const Color(0xFFFFB36B),
+      ),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+      children: [
+        Text('Settings', style: GoogleFonts.sora(fontSize: 34, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        const Text(
+          'Adjust the look and behavior of the app',
+          style: TextStyle(color: Color(0xFFB7C7EB)),
+        ),
+        const SizedBox(height: 22),
+        Text('Theme', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        ...themeOptions.map(
+          (option) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: _themePreset == option.value ? option.accent.withOpacity(0.18) : const Color(0x261A2B54),
+              border: Border.all(
+                color: _themePreset == option.value ? option.accent : const Color(0x2FAFC2FF),
+              ),
+            ),
+            child: RadioListTile<int>(
+              value: option.value,
+              groupValue: _themePreset,
+              onChanged: (value) {
+                if (value != null) {
+                  _setThemePreset(value);
+                }
+              },
+              activeColor: option.accent,
+              title: Text(option.label),
+              subtitle: Text(option.subtitle),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text('App Notes', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        _SettingsCard(
+          icon: Icons.favorite_rounded,
+          title: 'Liked songs',
+          subtitle: 'Use the heart icon on search results to save songs to your library.',
+        ),
+        const SizedBox(height: 12),
+        _SettingsCard(
+          icon: Icons.download_done_rounded,
+          title: 'Downloads',
+          subtitle: 'The Downloads tab shows local device audio and saved offline items.',
+        ),
+        const SizedBox(height: 12),
+        _SettingsCard(
+          icon: Icons.smart_display_rounded,
+          title: 'YouTube search',
+          subtitle: 'Search results come from the secure Vercel API at music.7kc.me.',
         ),
       ],
     );
@@ -1912,6 +2100,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   @override
   void dispose() {
     _discoverSearchController.dispose();
+    _pageController.dispose();
     _player.dispose();
     super.dispose();
   }
@@ -1923,6 +2112,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       _buildLibraryPage(),
       _buildNowPlayingPage(),
       _buildQueuePage(),
+      _buildSettingsPage(),
     ];
 
     return Scaffold(
@@ -1975,13 +2165,20 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               Expanded(
                 child: _loadingSource
                     ? const Center(child: CircularProgressIndicator())
-                    : IndexedStack(index: _currentTab, children: pages),
+                    : PageView(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          setState(() => _currentTab = index);
+                          _persistUiState();
+                        },
+                        children: pages,
+                      ),
               ),
               if (!_loadingSource && _currentTab != 2)
                 _MiniPlayerDock(
                   track: _currentTrack,
                   playingStream: _player.playingStream,
-                  onOpen: () => setState(() => _currentTab = 2),
+                  onOpen: _openExpandedPlayer,
                   onTogglePlayPause: _ensureQueueReadyAndPlay,
                   onNext: _nextTrackSafe,
                 ),
@@ -2000,6 +2197,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                     _navChip(1, Icons.library_music_rounded, 'Library'),
                     _navChip(2, Icons.play_circle_fill_rounded, 'Player'),
                     _navChip(3, Icons.queue_music_rounded, 'Queue'),
+                    _navChip(4, Icons.tune_rounded, 'Settings'),
                   ],
                 ),
               ),
@@ -2031,6 +2229,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     return GestureDetector(
       onTap: () {
         setState(() => _currentTab = index);
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOut,
+        );
         _persistUiState();
       },
       child: AnimatedContainer(
@@ -2247,6 +2450,55 @@ class _LibraryTabButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: const Color(0x261A2B54),
+        border: Border.all(color: const Color(0x2FAFC2FF)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0x3A8AAFFF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: const Color(0xFFEAF1FF), size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: const TextStyle(color: Color(0xFFB7C7EB), fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
