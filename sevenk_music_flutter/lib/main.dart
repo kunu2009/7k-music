@@ -9,6 +9,8 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +36,7 @@ class DemoTrack {
     required this.audioUrl,
     required this.artUrl,
     required this.lyrics,
+    this.youtubeVideoId,
   });
 
   final String id;
@@ -42,6 +45,7 @@ class DemoTrack {
   final String audioUrl;
   final String artUrl;
   final String lyrics;
+  final String? youtubeVideoId;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -50,6 +54,7 @@ class DemoTrack {
         'audioUrl': audioUrl,
         'artUrl': artUrl,
         'lyrics': lyrics,
+        'youtubeVideoId': youtubeVideoId,
       };
 
   factory DemoTrack.fromJson(Map<String, dynamic> json) {
@@ -60,6 +65,7 @@ class DemoTrack {
       audioUrl: json['audioUrl']?.toString() ?? '',
       artUrl: json['artUrl']?.toString() ?? _fallbackArtUrl,
       lyrics: json['lyrics']?.toString() ?? '',
+      youtubeVideoId: json['youtubeVideoId']?.toString(),
     );
   }
 }
@@ -238,6 +244,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final TextEditingController _discoverSearchController = TextEditingController();
   late final PageController _pageController;
+  late final WebViewController _youtubeController;
 
   static const String _prefsCurrentTabKey = 'sevenk.currentTab.v1';
   static const String _prefsActivePlaylistKey = 'sevenk.activePlaylist.v1';
@@ -264,6 +271,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   final List<SongModel> _deviceSongs = <SongModel>[];
   final Set<String> _downloadedTrackIds = <String>{};
   final Map<String, DemoTrack> _downloadedTrackCache = <String, DemoTrack>{};
+  String? _activeYouTubeVideoId;
   final Set<String> _likedTrackIds = <String>{};
   final Map<String, DemoTrack> _likedTrackCache = <String, DemoTrack>{};
   final Map<String, List<DemoTrack>> _playlistTracks = {
@@ -285,6 +293,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentTab);
+    _youtubeController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF000000));
     _player = AudioPlayer();
     _init();
   }
@@ -396,6 +407,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       return;
     }
 
+    if (_isYoutubeTrack(_currentTrack)) {
+      await _loadYoutubeTrack(_currentTrack);
+      return;
+    }
+
     if (_audioReady) {
       if (_player.playing) {
         await _player.pause();
@@ -410,6 +426,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Future<void> _nextTrackSafe() async {
     if (_queue.isEmpty) return;
+    if (_isYoutubeTrack(_currentTrack)) {
+      final nextIndex = (_trackIndex + 1).clamp(0, _queue.length - 1);
+      await _playTrackInQueue(nextIndex);
+      return;
+    }
     if (!_audioReady) {
       await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
       return;
@@ -419,6 +440,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Future<void> _previousTrackSafe() async {
     if (_queue.isEmpty) return;
+    if (_isYoutubeTrack(_currentTrack)) {
+      final previousIndex = (_trackIndex - 1).clamp(0, _queue.length - 1);
+      await _playTrackInQueue(previousIndex);
+      return;
+    }
     if (!_audioReady) {
       await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
       return;
@@ -435,6 +461,63 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       artUrl: _fallbackArtUrl,
       lyrics: 'Local file from your device storage.',
     );
+  }
+
+  bool _isLikelyMusicSong(SongModel song) {
+    final title = song.title.toLowerCase();
+    final artist = (song.artist ?? '').toLowerCase();
+    final combined = '$title $artist';
+    const blocked = [
+      'alarm',
+      'ringtone',
+      'notification',
+      'tone',
+      'ui ',
+      'sound',
+      'clock',
+      'boot',
+      'system',
+      'whatsapp',
+      'message',
+      'call',
+    ];
+
+    if ((song.duration ?? 0) < 30000) {
+      return false;
+    }
+
+    for (final term in blocked) {
+      if (combined.contains(term)) return false;
+    }
+
+    return true;
+  }
+
+  bool _isYoutubeTrack(DemoTrack track) {
+    return track.youtubeVideoId != null && track.youtubeVideoId!.isNotEmpty;
+  }
+
+  Uri _youtubeEmbedUri(String videoId) {
+    return Uri.parse('https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&controls=1&rel=0&modestbranding=1');
+  }
+
+  Future<void> _loadYoutubeTrack(DemoTrack track) async {
+    final videoId = track.youtubeVideoId;
+    if (videoId == null || videoId.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _startupError = null;
+        _loadingSource = false;
+        _audioReady = false;
+        _activeYouTubeVideoId = videoId;
+        _currentTab = 2;
+      });
+    }
+
+    await _youtubeController.loadRequest(_youtubeEmbedUri(videoId));
+    _pageController.jumpToPage(2);
+    await _persistUiState();
   }
 
   Future<void> _loadDeviceAudio() async {
@@ -465,7 +548,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       setState(() {
         _deviceSongs
           ..clear()
-          ..addAll(songs.where((song) => song.uri != null && song.duration != null));
+          ..addAll(songs.where((song) => song.uri != null && song.duration != null && _isLikelyMusicSong(song)));
       });
     } catch (_) {
       if (!mounted) return;
@@ -518,6 +601,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _queue = [localTrack];
         _trackIndex = 0;
         _audioReady = true;
+        _activeYouTubeVideoId = null;
         _loadingSource = false;
       });
       await _persistUiState();
@@ -585,6 +669,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             audioUrl: 'https://www.youtube.com/watch?v=$videoId',
             artUrl: thumbnail ?? _fallbackArtUrl,
             lyrics: 'YouTube music video. Click to play on YouTube.',
+            youtubeVideoId: videoId,
           ),
         );
       }
@@ -612,6 +697,19 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _playOrQueueTrack(DemoTrack track, {int? queueIndex}) async {
+    if (_isYoutubeTrack(track)) {
+      final existingIndex = _queue.indexWhere((item) => item.id == track.id);
+      if (existingIndex >= 0) {
+        _trackIndex = existingIndex;
+      } else {
+        _queue = [..._queue, track];
+        _trackIndex = _queue.length - 1;
+      }
+      await _persistUiState();
+      await _loadYoutubeTrack(track);
+      return;
+    }
+
     if (queueIndex != null) {
       await _playTrackInQueue(queueIndex);
       return;
@@ -792,6 +890,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         }
       }
 
+      _activeYouTubeVideoId = prefs.getString('sevenk.activeYouTubeVideoId.v1');
+
       themePresetNotifier.value = _themePreset;
     });
   }
@@ -820,6 +920,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       ),
     );
     await prefs.setString(_prefsThemePresetKey, _themePreset.toString());
+    if (_activeYouTubeVideoId == null) {
+      await prefs.remove('sevenk.activeYouTubeVideoId.v1');
+    } else {
+      await prefs.setString('sevenk.activeYouTubeVideoId.v1', _activeYouTubeVideoId!);
+    }
     await prefs.setString(
       _prefsLikedTracksKey,
       jsonEncode(
@@ -1016,6 +1121,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Future<void> _playTrackInQueue(int index) async {
     if (index < 0 || index >= _queue.length) return;
+    final selected = _queue[index];
+    if (_isYoutubeTrack(selected)) {
+      _trackIndex = index;
+      await _persistUiState();
+      await _loadYoutubeTrack(selected);
+      return;
+    }
+
     if (!_audioReady) {
       await _loadQueue(initialIndex: index, autoPlay: true);
       return;
@@ -1033,7 +1146,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _queue = List<DemoTrack>.of(tracks);
     final initialIndex = _queue.indexWhere((track) => track.id == selected.id);
     await _persistUiState();
-    await _loadQueue(initialIndex: initialIndex < 0 ? 0 : initialIndex, autoPlay: true);
+    await _playTrackInQueue(initialIndex < 0 ? 0 : initialIndex);
   }
 
   Future<void> _openPlaylistDetail(DemoPlaylist playlist) async {
@@ -1058,7 +1171,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _playlistTracks[playlist.id] = List<DemoTrack>.of(result.tracks);
     _queue = List<DemoTrack>.of(result.tracks);
     await _persistUiState();
-    await _loadQueue(initialIndex: result.startIndex, autoPlay: true);
+    await _playTrackInQueue(result.startIndex);
   }
 
   Future<void> _toggleRepeatMode() async {
@@ -1717,11 +1830,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                         ),
                         trailing: IconButton(
                           icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFF8AAFFF)),
-                          onPressed: () {
-                            // In a real app, you'd use url_launcher to open the URL
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Opening ${service.name}...')),
-                            );
+                          onPressed: () async {
+                            final uri = Uri.parse(service.url);
+                            final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                            if (!opened && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Could not open ${service.name}')),
+                              );
+                            }
                           },
                         ),
                         isThreeLine: true,
@@ -1821,6 +1937,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Widget _buildNowPlayingPage() {
     final track = _currentTrack;
+    final isYoutube = _isYoutubeTrack(track);
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
       children: [
@@ -1833,53 +1950,68 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           ],
         ),
         const SizedBox(height: 20),
-        Container(
-          height: 340,
-          decoration: BoxDecoration(
+        if (isYoutube)
+          ClipRRect(
             borderRadius: BorderRadius.circular(30),
-            image: DecorationImage(image: NetworkImage(track.artUrl), fit: BoxFit.cover),
-            boxShadow: const [BoxShadow(color: Color(0x7F223E83), blurRadius: 36, spreadRadius: 6)],
+            child: SizedBox(
+              height: 280,
+              child: WebViewWidget(controller: _youtubeController),
+            ),
+          )
+        else
+          Container(
+            height: 340,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              image: DecorationImage(image: NetworkImage(track.artUrl), fit: BoxFit.cover),
+              boxShadow: const [BoxShadow(color: Color(0x7F223E83), blurRadius: 36, spreadRadius: 6)],
+            ),
           ),
-        ),
         const SizedBox(height: 18),
         Text(track.title, style: GoogleFonts.sora(fontSize: 31, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         Text(track.artist, style: const TextStyle(color: Color(0xFFB7C7EB), fontSize: 15)),
         const SizedBox(height: 18),
-        StreamBuilder<Duration>(
-          stream: _player.positionStream,
-          builder: (context, snapshot) {
-            final position = snapshot.data ?? Duration.zero;
-            final duration = _player.duration ?? const Duration(seconds: 1);
-            final max = duration.inMilliseconds.toDouble();
-            final value = position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
-            return Column(
-              children: [
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    activeTrackColor: const Color(0xFFE3ECFF),
-                    inactiveTrackColor: const Color(0x33FFFFFF),
-                    thumbColor: Colors.white,
-                    trackHeight: 3,
+        if (!isYoutube)
+          StreamBuilder<Duration>(
+            stream: _player.positionStream,
+            builder: (context, snapshot) {
+              final position = snapshot.data ?? Duration.zero;
+              final duration = _player.duration ?? const Duration(seconds: 1);
+              final max = duration.inMilliseconds.toDouble();
+              final value = position.inMilliseconds.clamp(0, duration.inMilliseconds).toDouble();
+              return Column(
+                children: [
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: const Color(0xFFE3ECFF),
+                      inactiveTrackColor: const Color(0x33FFFFFF),
+                      thumbColor: Colors.white,
+                      trackHeight: 3,
+                    ),
+                    child: Slider(
+                      min: 0,
+                      max: max,
+                      value: value,
+                      onChanged: (next) => _player.seek(Duration(milliseconds: next.toInt())),
+                    ),
                   ),
-                  child: Slider(
-                    min: 0,
-                    max: max,
-                    value: value,
-                    onChanged: (next) => _player.seek(Duration(milliseconds: next.toInt())),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_format(position), style: const TextStyle(color: Color(0xFFBBC8E7))),
+                      Text(_format(duration), style: const TextStyle(color: Color(0xFFBBC8E7))),
+                    ],
                   ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_format(position), style: const TextStyle(color: Color(0xFFBBC8E7))),
-                    Text(_format(duration), style: const TextStyle(color: Color(0xFFBBC8E7))),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
+                ],
+              );
+            },
+          )
+        else
+          const Text(
+            'Playing in embedded YouTube view.',
+            style: TextStyle(color: Color(0xFFB7C7EB)),
+          ),
         const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1889,33 +2021,56 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               onTap: _toggleShuffleMode,
             ),
             _glassIcon(Icons.skip_previous_rounded, onTap: _previousTrackSafe),
-            StreamBuilder<bool>(
-              stream: _player.playingStream,
-              builder: (context, snapshot) {
-                final isPlaying = snapshot.data ?? false;
-                return GestureDetector(
-                  onTap: _ensureQueueReadyAndPlay,
-                  child: Container(
-                    width: 84,
-                    height: 84,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFEAF1FF), Color(0xFFCCD9FF)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                      boxShadow: [BoxShadow(color: Color(0x80A1B9FF), blurRadius: 30, spreadRadius: 4)],
+            if (isYoutube)
+              GestureDetector(
+                onTap: () async {
+                  if (_activeYouTubeVideoId != null) {
+                    await _loadYoutubeTrack(track);
+                  }
+                },
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFEAF1FF), Color(0xFFCCD9FF)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     ),
-                    child: Icon(
-                      isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: const Color(0xFF1D2A55),
-                      size: 46,
-                    ),
+                    boxShadow: [BoxShadow(color: Color(0x80A1B9FF), blurRadius: 30, spreadRadius: 4)],
                   ),
-                );
-              },
-            ),
+                  child: const Icon(Icons.play_arrow_rounded, color: Color(0xFF1D2A55), size: 46),
+                ),
+              )
+            else
+              StreamBuilder<bool>(
+                stream: _player.playingStream,
+                builder: (context, snapshot) {
+                  final isPlaying = snapshot.data ?? false;
+                  return GestureDetector(
+                    onTap: _ensureQueueReadyAndPlay,
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFEAF1FF), Color(0xFFCCD9FF)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                        boxShadow: [BoxShadow(color: Color(0x80A1B9FF), blurRadius: 30, spreadRadius: 4)],
+                      ),
+                      child: Icon(
+                        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: const Color(0xFF1D2A55),
+                        size: 46,
+                      ),
+                    ),
+                  );
+                },
+              ),
             _glassIcon(Icons.skip_next_rounded, onTap: _nextTrackSafe),
             _glassIcon(_repeatIcon(_loopMode), onTap: _toggleRepeatMode),
           ],
