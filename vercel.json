@@ -1,14 +1,25 @@
 {
   "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
+  "installCommand": "npm install",
   "outputDirectory": "dist",
   "framework": "vite",
   "functions": {
     "api/**/*.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "nodejs20.x"
     }
   },
-  "env": [
-    "VITE_YOUTUBE_API_KEY"
-  ]
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "VITE_YOUTUBE_API_KEY": "@vite_youtube_api_key"
+  }
 }
