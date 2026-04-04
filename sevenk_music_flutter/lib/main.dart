@@ -60,7 +60,7 @@ const allTracks = <DemoTrack>[
     id: '1',
     title: 'Neon Horizon',
     artist: '7K Session',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    audioUrl: 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3',
     artUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600',
     lyrics:
         'Neon lights in midnight rain\nHold me close in purple haze\nEvery heartbeat feels alive\nWe are echoes in the sky',
@@ -69,7 +69,7 @@ const allTracks = <DemoTrack>[
     id: '2',
     title: 'Night Pulse',
     artist: '7K Session',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    audioUrl: 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Temple-of-God.mp3',
     artUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600',
     lyrics:
         'City drums are calling out\nCrowded rooms and flashing sounds\nStay with me until sunrise\nFeel the rush behind our eyes',
@@ -78,7 +78,7 @@ const allTracks = <DemoTrack>[
     id: '3',
     title: 'Blue Drift',
     artist: '7K Session',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    audioUrl: 'https://samplelib.com/lib/preview/mp3/sample-12s.mp3',
     artUrl: 'https://images.unsplash.com/photo-1501612780327-45045538702b?w=600',
     lyrics:
         'Falling slow through open air\nSilver dust is everywhere\nBlue horizon, quiet glow\nTake me where the wild winds go',
@@ -87,7 +87,7 @@ const allTracks = <DemoTrack>[
     id: '4',
     title: 'Electric Bloom',
     artist: 'Afterline',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    audioUrl: 'https://samplelib.com/lib/preview/mp3/sample-15s.mp3',
     artUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600',
     lyrics:
         'Static flowers in the dark\nTiny sparks become a fire\nTouch the rhythm, touch the wire\nRise with me and climb higher',
@@ -96,7 +96,7 @@ const allTracks = <DemoTrack>[
     id: '5',
     title: 'Afterglow Drive',
     artist: 'Nova Miles',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+    audioUrl: 'https://samplelib.com/lib/preview/mp3/sample-9s.mp3',
     artUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=600',
     lyrics:
         'Highway lines and amber skies\nRadio sparks in your eyes\nRoll the windows, breathe the night\nKeep the afterglow in sight',
@@ -180,6 +180,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _shuffleEnabled = false;
   bool _loadingSource = true;
   bool _lyricsExpanded = true;
+  bool _audioReady = false;
   String? _startupError;
   SharedPreferences? _prefs;
   
@@ -251,6 +252,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       await _player
           .setAudioSources(sources, initialIndex: initialIndex)
           .timeout(const Duration(seconds: 30));
+      _audioReady = true;
       if (autoPlay) {
         await _player.play();
       }
@@ -258,6 +260,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       debugPrint('Queue load failed: $error');
       if (mounted) {
         setState(() {
+          _audioReady = false;
           _startupError = 'Could not load audio. Check network and tap Retry.';
         });
       }
@@ -269,6 +272,35 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         });
       }
     }
+  }
+
+  Future<void> _ensureQueueReadyAndPlay() async {
+    if (_audioReady) {
+      if (_player.playing) {
+        await _player.pause();
+      } else {
+        await _player.play();
+      }
+      return;
+    }
+
+    await _loadQueue(initialIndex: _trackIndex, autoPlay: true);
+  }
+
+  Future<void> _nextTrackSafe() async {
+    if (!_audioReady) {
+      await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
+      return;
+    }
+    await _player.seekToNext();
+  }
+
+  Future<void> _previousTrackSafe() async {
+    if (!_audioReady) {
+      await _loadQueue(initialIndex: _trackIndex, autoPlay: false);
+      return;
+    }
+    await _player.seekToPrevious();
   }
 
   DemoTrack get _currentTrack => _queue[_trackIndex.clamp(0, _queue.length - 1)];
@@ -357,7 +389,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     setState(() {
-      _currentTab = prefs.getInt(_prefsCurrentTabKey) ?? 0;
+      final savedTab = prefs.getInt(_prefsCurrentTabKey) ?? 0;
+      _currentTab = savedTab.clamp(0, 3);
 
       final recentSearches = prefs.getStringList(_prefsRecentSearchesKey) ?? const <String>[];
       _recentDiscoverSearches
@@ -521,6 +554,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Future<void> _playTrackInQueue(int index) async {
     if (index < 0 || index >= _queue.length) return;
+    if (!_audioReady) {
+      await _loadQueue(initialIndex: index, autoPlay: true);
+      return;
+    }
     await _player.seek(Duration.zero, index: index);
     await _player.play();
   }
@@ -1195,13 +1232,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
               _shuffleEnabled ? Icons.shuffle_on_rounded : Icons.shuffle_rounded,
               onTap: _toggleShuffleMode,
             ),
-            _glassIcon(Icons.skip_previous_rounded, onTap: _player.seekToPrevious),
+            _glassIcon(Icons.skip_previous_rounded, onTap: _previousTrackSafe),
             StreamBuilder<bool>(
               stream: _player.playingStream,
               builder: (context, snapshot) {
                 final isPlaying = snapshot.data ?? false;
                 return GestureDetector(
-                  onTap: () => isPlaying ? _player.pause() : _player.play(),
+                  onTap: _ensureQueueReadyAndPlay,
                   child: Container(
                     width: 84,
                     height: 84,
@@ -1223,7 +1260,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                 );
               },
             ),
-            _glassIcon(Icons.skip_next_rounded, onTap: _player.seekToNext),
+            _glassIcon(Icons.skip_next_rounded, onTap: _nextTrackSafe),
             _glassIcon(_repeatIcon(_loopMode), onTap: _toggleRepeatMode),
           ],
         ),
@@ -1428,85 +1465,72 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           ),
         ),
         child: SafeArea(
-          child: Stack(
+          child: Column(
             children: [
-              if (_loadingSource)
-                const Center(child: CircularProgressIndicator())
-              else
-                Column(
-                  children: [
-                    // Error banner at top (non-blocking)
-                    if (_startupError != null)
-                      Container(
-                        margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: const Color(0x4DB74562),
-                          border: Border.all(color: const Color(0xFFE57373)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.warning_rounded, size: 18, color: Color(0xFFE57373)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _startupError!,
-                                style: const TextStyle(color: Color(0xFFFFCDD2), fontSize: 13),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            FilledButton.icon(
-                              onPressed: () => _loadQueue(initialIndex: 0, autoPlay: false),
-                              icon: const Icon(Icons.refresh_rounded, size: 14),
-                              label: const Text('Retry'),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                backgroundColor: const Color(0xFFE57373),
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    // Pages remain visible below banner
-                    Expanded(
-                      child: IndexedStack(index: _currentTab, children: pages),
-                    ),
-                  ],
-                ),
-              if (!_loadingSource && _currentTab != 2)
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _MiniPlayerDock(
-                    track: _currentTrack,
-                    playingStream: _player.playingStream,
-                    onOpen: () => setState(() => _currentTab = 2),
-                    onTogglePlayPause: () => _player.playing ? _player.pause() : _player.play(),
-                    onNext: _player.seekToNext,
-                  ),
-                ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              if (_startupError != null)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xCC0E1733),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0x45AFC2FF)),
+                    borderRadius: BorderRadius.circular(12),
+                    color: const Color(0x4DB74562),
+                    border: Border.all(color: const Color(0xFFE57373)),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _navChip(0, Icons.explore_rounded, 'Discover'),
-                      _navChip(1, Icons.library_music_rounded, 'Library'),
-                      _navChip(2, Icons.play_circle_fill_rounded, 'Player'),
-                      _navChip(3, Icons.queue_music_rounded, 'Queue'),
+                      const Icon(Icons.warning_rounded, size: 18, color: Color(0xFFE57373)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _startupError!,
+                          style: const TextStyle(color: Color(0xFFFFCDD2), fontSize: 13),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: () => _loadQueue(initialIndex: 0, autoPlay: false),
+                        icon: const Icon(Icons.refresh_rounded, size: 14),
+                        label: const Text('Retry'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          backgroundColor: const Color(0xFFE57373),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
                     ],
                   ),
+                ),
+              Expanded(
+                child: _loadingSource
+                    ? const Center(child: CircularProgressIndicator())
+                    : IndexedStack(index: _currentTab, children: pages),
+              ),
+              if (!_loadingSource && _currentTab != 2)
+                _MiniPlayerDock(
+                  track: _currentTrack,
+                  playingStream: _player.playingStream,
+                  onOpen: () => setState(() => _currentTab = 2),
+                  onTogglePlayPause: _ensureQueueReadyAndPlay,
+                  onNext: _nextTrackSafe,
+                ),
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xCC0E1733),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0x45AFC2FF)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _navChip(0, Icons.explore_rounded, 'Discover'),
+                    _navChip(1, Icons.library_music_rounded, 'Library'),
+                    _navChip(2, Icons.play_circle_fill_rounded, 'Player'),
+                    _navChip(3, Icons.queue_music_rounded, 'Queue'),
+                  ],
                 ),
               ),
             ],
@@ -1758,7 +1782,7 @@ class _MiniPlayerDock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xE6192A54),
