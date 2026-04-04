@@ -518,41 +518,30 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     try {
-      // Replace with your YouTube API key from https://console.cloud.google.com
-      const youtubeApiKey = 'YOUR_YOUTUBE_API_KEY_HERE';
-      
-      // Use YouTube Data API v3 to search for music videos
-      final uri = Uri.https('www.googleapis.com', '/youtube/v3/search', {
+      // Call secure backend endpoint on Vercel (uses VITE_YOUTUBE_API_KEY env var)
+      final uri = Uri.https('7kmusic.vercel.app', '/api/search', {
         'q': normalized,
-        'part': 'snippet',
         'maxResults': '25',
-        'type': 'video',
-        'videoCategoryId': '10', // Music category
-        'key': youtubeApiKey,
-        'order': 'relevance',
       });
 
       final response = await http.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
-        throw Exception('YouTube API request failed: ${response.statusCode}');
+        throw Exception('Search API failed: ${response.statusCode}');
       }
 
       final decoded = jsonDecode(response.body);
-      final items = decoded is Map<String, dynamic> && decoded['items'] is List
-          ? decoded['items'] as List
+      final results = decoded is Map<String, dynamic> && decoded['results'] is List
+          ? decoded['results'] as List
           : const <dynamic>[];
 
       final parsed = <DemoTrack>[];
-      for (final item in items) {
+      for (final item in results) {
         if (item is! Map<String, dynamic>) continue;
-        
-        final snippet = item['snippet'];
-        if (snippet is! Map<String, dynamic>) continue;
-        
-        final videoId = item['id']?['videoId']?.toString();
-        final title = snippet['title']?.toString();
-        final channelTitle = snippet['channelTitle']?.toString();
-        final thumbnail = snippet['thumbnails']?['medium']?['url']?.toString();
+
+        final videoId = item['id']?.toString();
+        final title = item['title']?.toString();
+        final artist = item['artist']?.toString();
+        final thumbnail = item['thumbnail']?.toString();
         
         if (videoId == null || title == null || title.trim().isEmpty) continue;
 
@@ -560,7 +549,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           DemoTrack(
             id: 'yt-$videoId',
             title: title,
-            artist: channelTitle ?? 'Unknown Artist',
+            artist: artist ?? 'Unknown Artist',
             audioUrl: 'https://www.youtube.com/watch?v=$videoId',
             artUrl: thumbnail ?? _fallbackArtUrl,
             lyrics: 'YouTube music video. Click to play on YouTube.',
@@ -573,14 +562,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _discoverRemoteTracks
           ..clear()
           ..addAll(parsed);
-        _discoverSearchError = parsed.isEmpty ? 'No results on YouTube.' : null;
+        _discoverSearchError = parsed.isEmpty ? 'No search results found.' : null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _discoverSearchError = 'YouTube search failed. Add API key in code. Check network and try again.';
+        _discoverSearchError = 'Search failed. Check network and try again.';
       });
-      debugPrint('YouTube search error: $e');
+      debugPrint('Search error: $e');
     } finally {
       if (mounted) {
         setState(() {
