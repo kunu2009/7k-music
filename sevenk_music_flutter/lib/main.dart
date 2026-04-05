@@ -14,17 +14,9 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.sevenkmusic.player.channel.audio',
-      androidNotificationChannelName: '7K Music Playback',
-      androidNotificationOngoing: true,
-    );
-  } catch (error) {
-    // Keep app startup resilient on older/quirky Android builds.
-    debugPrint('JustAudioBackground init failed: $error');
-  }
-
+  // Note: JustAudioBackground disabled as it causes single-instance conflicts
+  // when using just_audio in foreground-only playback. Re-enable if background
+  // playback service is needed later.
   runApp(const SevenKMusicApp());
 }
 
@@ -735,7 +727,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       try {
         await _youtubeController.loadHtmlString(
           _youtubeEmbedHtml(videoId, autoplay: autoplay),
-          baseUrl: 'https://www.youtube.com',
+          baseUrl: 'https://www.youtube-nocookie.com',
         );
       } catch (error) {
         debugPrint('YouTube embed load failed: $error');
