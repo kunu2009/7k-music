@@ -10,7 +10,7 @@ export interface AndroidApkOption {
 
 export const ANDROID_RELEASE_META = {
   versionLabel: 'v1.0.0+1',
-  buildLabel: 'Build 2026.04.04',
+  buildLabel: 'Build 2026.04.05',
   notes: 'Split APK release for smaller per-device installs.',
 };
 
@@ -20,21 +20,21 @@ export const ANDROID_APK_OPTIONS: AndroidApkOption[] = [
     label: 'ARM64 (Most phones)',
     description: 'Best for newer Android phones and tablets (64-bit ARM).',
     sizeLabel: '17.8 MB',
-    href: '/apk/7k-music-arm64-v8a.apk',
+    href: '/apk/app-arm64-v8a-release.apk',
   },
   {
     abi: 'armeabi-v7a',
     label: 'ARMv7 (Older phones)',
     description: 'For older 32-bit ARM Android phones.',
     sizeLabel: '15.4 MB',
-    href: '/apk/7k-music-armeabi-v7a.apk',
+    href: '/apk/app-armeabi-v7a-release.apk',
   },
   {
     abi: 'x86_64',
     label: 'x86_64 (Emulators/rare devices)',
     description: 'Mainly for Android emulators and uncommon x86 devices.',
     sizeLabel: '18.9 MB',
-    href: '/apk/7k-music-x86_64.apk',
+    href: '/apk/app-x86_64-release.apk',
   },
 ];
 
