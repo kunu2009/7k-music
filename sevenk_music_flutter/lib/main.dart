@@ -256,7 +256,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   static const String _prefsLibraryTabKey = 'sevenk.libraryTab.v1';
   static const String _prefsThemePresetKey = 'sevenk.themePreset.v1';
   static const String _prefsLikedTracksKey = 'sevenk.likedTracks.v1';
-  static const bool _youtubeExternalPlaybackOnly = true;
+  static const bool _youtubeExternalPlaybackOnly = false;
 
   int _currentTab = 0;
   int _libraryTabIndex = 0; // 0 = Playlists, 1 = Downloads, 2 = Royalty-Free
@@ -287,6 +287,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _lyricsExpanded = true;
   bool _audioReady = false;
   String? _startupError;
+  String? _localPlaybackDebug;
   SharedPreferences? _prefs;
   
 
@@ -296,6 +297,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _pageController = PageController(initialPage: _currentTab);
     _youtubeController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onWebResourceError: (error) {
+            debugPrint('YouTube webview error: ${error.description}');
+          },
+        ),
+      )
       ..setBackgroundColor(const Color(0xFF000000));
     _player = AudioPlayer();
     _init();
@@ -651,6 +659,41 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     );
   }
 
+  String _youtubeEmbedHtml(String videoId, {required bool autoplay}) {
+    final embedUrl = _youtubeEmbedUri(videoId, autoplay: autoplay).toString();
+    return '''
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      iframe {
+        border: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe
+      src="$embedUrl"
+      title="YouTube video player"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen>
+    </iframe>
+  </body>
+</html>
+''';
+  }
+
   Uri _youtubeWatchUri(String videoId) {
     return Uri.parse('https://www.youtube.com/watch?v=$videoId');
   }
@@ -690,7 +733,10 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       }
     } else {
       try {
-        await _youtubeController.loadRequest(_youtubeEmbedUri(videoId, autoplay: autoplay));
+        await _youtubeController.loadHtmlString(
+          _youtubeEmbedHtml(videoId, autoplay: autoplay),
+          baseUrl: 'https://www.youtube.com',
+        );
       } catch (error) {
         debugPrint('YouTube embed load failed: $error');
         if (mounted) {
@@ -783,6 +829,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         setState(() {
           _loadingSource = true;
           _startupError = null;
+          _localPlaybackDebug = null;
         });
       }
 
@@ -796,6 +843,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       for (final candidate in sourceCandidates) {
 
         try {
+          await _player.stop();
           await _setPlayerSourceFromCandidate(
             candidate: candidate,
             tag: tag,
@@ -805,7 +853,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           lastError = null;
           break;
         } catch (error) {
-          lastError = error;
+          lastError = 'candidate=$candidate error=$error';
         }
       }
 
@@ -827,6 +875,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       if (!mounted) return;
       setState(() {
         _startupError = 'Could not play local audio file. Try another file or refresh the library.';
+        _localPlaybackDebug = error.toString();
         _loadingSource = false;
       });
     }
@@ -1973,6 +2022,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                             subtitleSuffix: 'Local file',
                           ),
                         ),
+                  if (_localPlaybackDebug != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Local playback debug: $_localPlaybackDebug',
+                      style: const TextStyle(color: Color(0xFFFFB4B4), fontSize: 11),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Text('Saved for Offline', style: GoogleFonts.sora(fontSize: 18, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
