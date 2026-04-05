@@ -256,6 +256,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   static const String _prefsLibraryTabKey = 'sevenk.libraryTab.v1';
   static const String _prefsThemePresetKey = 'sevenk.themePreset.v1';
   static const String _prefsLikedTracksKey = 'sevenk.likedTracks.v1';
+  static const bool _youtubeExternalPlaybackOnly = true;
 
   int _currentTab = 0;
   int _libraryTabIndex = 0; // 0 = Playlists, 1 = Downloads, 2 = Royalty-Free
@@ -365,19 +366,18 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       return;
     }
 
-    final candidateUris = <Uri>[];
-    try {
-      candidateUris.add(_resolvePlayableUri(targetTrack.audioUrl));
-    } catch (error) {
-      debugPrint('Invalid queue audio URI for ${targetTrack.id}: $error');
+    final candidateSources = <String>[];
+    if (targetTrack.audioUrl.trim().isNotEmpty) {
+      candidateSources.add(targetTrack.audioUrl.trim());
     }
 
     if (targetTrack.id.startsWith('local-')) {
       for (final song in _deviceSongs) {
         if ('local-${song.id}' == targetTrack.id) {
           for (final uri in _localAudioUris(song)) {
-            if (!candidateUris.contains(uri)) {
-              candidateUris.add(uri);
+            final next = uri.toString();
+            if (!candidateSources.contains(next)) {
+              candidateSources.add(next);
             }
           }
           break;
@@ -391,24 +391,26 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     });
 
     try {
-      if (candidateUris.isEmpty) {
+      if (candidateSources.isEmpty) {
         throw const FormatException('Invalid audio source');
       }
 
       Object? lastError;
-      for (final uri in candidateUris) {
-        final source = AudioSource.uri(
-          uri,
-          tag: MediaItem(
-            id: targetTrack.id,
-            title: targetTrack.title,
-            artist: targetTrack.artist,
-            artUri: Uri.parse(targetTrack.artUrl),
-          ),
-        );
+      final tag = MediaItem(
+        id: targetTrack.id,
+        title: targetTrack.title,
+        artist: targetTrack.artist,
+        artUri: Uri.parse(targetTrack.artUrl),
+      );
+
+      for (final candidate in candidateSources) {
 
         try {
-          await _player.setAudioSource(source).timeout(const Duration(seconds: 30));
+          await _setPlayerSourceFromCandidate(
+            candidate: candidate,
+            tag: tag,
+            timeout: const Duration(seconds: 30),
+          );
           if (autoPlay) {
             await _player.play();
           }
@@ -528,6 +530,47 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     return _safeSongData(song);
   }
 
+  bool _looksLikeFilePath(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return false;
+    return trimmed.startsWith('/') || RegExp(r'^[A-Za-z]:\\').hasMatch(trimmed);
+  }
+
+  String? _asFilePath(String value) {
+    final trimmed = value.trim();
+    if (trimmed.startsWith('file://')) {
+      try {
+        return Uri.parse(trimmed).toFilePath();
+      } catch (_) {
+        return null;
+      }
+    }
+    if (_looksLikeFilePath(trimmed)) {
+      return trimmed;
+    }
+    return null;
+  }
+
+  Future<void> _setPlayerSourceFromCandidate({
+    required String candidate,
+    required MediaItem tag,
+    required Duration timeout,
+  }) async {
+    final trimmed = candidate.trim();
+    if (trimmed.isEmpty) {
+      throw const FormatException('Empty audio source');
+    }
+
+    final filePath = _asFilePath(trimmed);
+    if (filePath != null) {
+      await _player.setFilePath(filePath, tag: tag).timeout(timeout);
+      return;
+    }
+
+    final uri = _resolvePlayableUri(trimmed);
+    await _player.setAudioSource(AudioSource.uri(uri, tag: tag)).timeout(timeout);
+  }
+
   Uri _resolvePlayableUri(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
@@ -634,14 +677,27 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       });
     }
 
-    try {
-      await _youtubeController.loadRequest(_youtubeEmbedUri(videoId, autoplay: autoplay));
-    } catch (error) {
-      debugPrint('YouTube embed load failed: $error');
-      if (mounted) {
-        setState(() {
-          _startupError = 'Embedded playback failed. Tap Watch on YouTube below.';
-        });
+    if (_youtubeExternalPlaybackOnly) {
+      try {
+        await _openYoutubeExternal(videoId);
+      } catch (error) {
+        debugPrint('YouTube external launch failed: $error');
+        if (mounted) {
+          setState(() {
+            _startupError = 'Could not open YouTube. Please try again.';
+          });
+        }
+      }
+    } else {
+      try {
+        await _youtubeController.loadRequest(_youtubeEmbedUri(videoId, autoplay: autoplay));
+      } catch (error) {
+        debugPrint('YouTube embed load failed: $error');
+        if (mounted) {
+          setState(() {
+            _startupError = 'Embedded playback failed. Tap Watch on YouTube below.';
+          });
+        }
       }
     }
     _pageController.jumpToPage(2);
@@ -703,8 +759,15 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   Future<void> _playLocalSong(SongModel song) async {
-    final uris = _localAudioUris(song);
-    if (uris.isEmpty) {
+    final sourceCandidates = <String>[];
+    for (final uri in _localAudioUris(song)) {
+      final next = uri.toString();
+      if (!sourceCandidates.contains(next)) {
+        sourceCandidates.add(next);
+      }
+    }
+
+    if (sourceCandidates.isEmpty) {
       if (!mounted) return;
       setState(() {
         _startupError = 'Selected local file is unavailable.';
@@ -723,19 +786,21 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         });
       }
 
-      for (final uri in uris) {
-        final source = AudioSource.uri(
-          uri,
-          tag: MediaItem(
-            id: localTrack.id,
-            title: localTrack.title,
-            artist: localTrack.artist,
-            artUri: Uri.parse(_fallbackArtUrl),
-          ),
-        );
+      final tag = MediaItem(
+        id: localTrack.id,
+        title: localTrack.title,
+        artist: localTrack.artist,
+        artUri: Uri.parse(_fallbackArtUrl),
+      );
+
+      for (final candidate in sourceCandidates) {
 
         try {
-          await _player.setAudioSource(source).timeout(const Duration(seconds: 20));
+          await _setPlayerSourceFromCandidate(
+            candidate: candidate,
+            tag: tag,
+            timeout: const Duration(seconds: 20),
+          );
           await _player.play();
           lastError = null;
           break;
@@ -2120,13 +2185,32 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         ),
         const SizedBox(height: 20),
         if (isYoutube)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: SizedBox(
-              height: 280,
-              child: WebViewWidget(controller: _youtubeController),
-            ),
-          )
+          (_youtubeExternalPlaybackOnly
+              ? Container(
+                  height: 280,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    color: const Color(0x261A2B54),
+                    border: Border.all(color: const Color(0x2FAFC2FF)),
+                  ),
+                  child: const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'This track opens directly in YouTube to avoid embedded playback restrictions.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Color(0xFFB7C7EB), height: 1.4),
+                      ),
+                    ),
+                  ),
+                )
+              : ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: SizedBox(
+                    height: 280,
+                    child: WebViewWidget(controller: _youtubeController),
+                  ),
+                ))
         else
           Container(
             height: 340,
@@ -2177,9 +2261,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             },
           )
         else
-          const Text(
-            'Playing in embedded YouTube view.',
-            style: TextStyle(color: Color(0xFFB7C7EB)),
+          Text(
+            _youtubeExternalPlaybackOnly
+                ? 'Playback opens in the YouTube app/browser.'
+                : 'Playing in embedded YouTube view.',
+            style: const TextStyle(color: Color(0xFFB7C7EB)),
           ),
         if (isYoutube && _activeYouTubeVideoId != null) ...[
           const SizedBox(height: 10),
