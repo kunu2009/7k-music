@@ -279,6 +279,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _deviceAudioLoading = false;
   bool _lyricsExpanded = true;
   bool _audioReady = false;
+  bool _youtubePlaying = false;
   String? _startupError;
   String? _localPlaybackDebug;
   SharedPreferences? _prefs;
@@ -663,7 +664,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   }
 
   String _youtubeEmbedHtml(String videoId, {required bool autoplay}) {
-    final embedUrl = _youtubeEmbedUri(videoId, autoplay: autoplay).toString();
+    final autoplayFlag = autoplay ? 1 : 0;
     return '''
 <!doctype html>
 <html>
@@ -683,15 +684,59 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         width: 100%;
         height: 100%;
       }
+      #player {
+        width: 100%;
+        height: 100%;
+      }
     </style>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+      var player = null;
+      function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+          videoId: '$videoId',
+          playerVars: {
+            autoplay: $autoplayFlag,
+            controls: 1,
+            playsinline: 1,
+            rel: 0,
+            modestbranding: 1,
+            iv_load_policy: 3,
+            origin: 'https://www.youtube-nocookie.com'
+          },
+          events: {
+            onReady: function(event) {
+              if ($autoplayFlag == 1) {
+                event.target.playVideo();
+              }
+            }
+          }
+        });
+      }
+      function playPlayback() {
+        if (player) player.playVideo();
+      }
+      function pausePlayback() {
+        if (player) player.pauseVideo();
+      }
+      function togglePlayback() {
+        if (!player) return;
+        var state = player.getPlayerState();
+        if (state === YT.PlayerState.PLAYING) {
+          player.pauseVideo();
+        } else {
+          player.playVideo();
+        }
+      }
+      function restartPlayback() {
+        if (!player) return;
+        player.seekTo(0, true);
+        player.playVideo();
+      }
+    </script>
   </head>
   <body>
-    <iframe
-      src="$embedUrl"
-      title="YouTube video player"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      allowfullscreen>
-    </iframe>
+    <div id="player"></div>
   </body>
 </html>
 ''';
@@ -719,6 +764,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _loadingSource = false;
         _audioReady = false;
         _activeYouTubeVideoId = videoId;
+        _youtubePlaying = autoplay;
         _currentTab = 2;
       });
     }
@@ -745,6 +791,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         if (mounted) {
           setState(() {
             _startupError = 'Embedded playback failed. Tap Watch on YouTube below.';
+            _youtubePlaying = false;
           });
         }
       }
@@ -870,6 +917,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _trackIndex = 0;
         _audioReady = true;
         _activeYouTubeVideoId = null;
+        _youtubePlaying = false;
         _loadingSource = false;
         _currentTab = 2;
       });
@@ -882,7 +930,22 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _startupError = 'Could not play local audio file. Try another file or refresh the library.';
         _localPlaybackDebug = error.toString();
         _loadingSource = false;
+        _youtubePlaying = false;
       });
+    }
+  }
+
+  Future<void> _toggleYoutubePlayback() async {
+    if (_activeYouTubeVideoId == null) return;
+    try {
+      await _youtubeController.runJavaScript('togglePlayback();');
+      if (mounted) {
+        setState(() {
+          _youtubePlaying = !_youtubePlaying;
+        });
+      }
+    } catch (error) {
+      debugPrint('YouTube playback toggle failed: $error');
     }
   }
 
@@ -2493,7 +2556,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             _glassIcon(Icons.skip_previous_rounded, onTap: _previousTrackSafe),
             if (isYoutube)
               GestureDetector(
-                onTap: _activeYouTubeVideoId == null ? () { unawaited(_loadYoutubeTrack(track)); } : null,
+                onTap: _activeYouTubeVideoId == null
+                    ? () {
+                        unawaited(_loadYoutubeTrack(track));
+                      }
+                    : _toggleYoutubePlayback,
                 child: Container(
                   width: 84,
                   height: 84,
@@ -2506,7 +2573,11 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                     ),
                     boxShadow: [BoxShadow(color: Color(0x80A1B9FF), blurRadius: 30, spreadRadius: 4)],
                   ),
-                  child: const Icon(Icons.play_arrow_rounded, color: Color(0xFF1D2A55), size: 46),
+                  child: Icon(
+                    _youtubePlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: const Color(0xFF1D2A55),
+                    size: 46,
+                  ),
                 ),
               )
             else
@@ -2819,9 +2890,12 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                         children: pages,
                       ),
                       if (_loadingSource)
-                        Container(
-                          color: const Color(0x66101022),
-                          child: const Center(child: CircularProgressIndicator()),
+                        IgnorePointer(
+                          ignoring: true,
+                          child: Container(
+                            color: const Color(0x66101022),
+                            child: const Center(child: CircularProgressIndicator()),
+                          ),
                         ),
                     ],
                   ),
