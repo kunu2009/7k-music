@@ -151,6 +151,26 @@ function upsertJsonLd(id: string, value: object) {
 export function SeoManager() {
   const location = useLocation();
   const isDownloadsPage = location.pathname.startsWith('/downloads');
+  const isCategoriesPage = location.pathname.startsWith('/categories');
+
+  const breadcrumbItems: Array<{ name: string; path: string }> = (() => {
+    if (location.pathname === '/') {
+      return [{ name: 'Home', path: '/' }];
+    }
+    if (isDownloadsPage) {
+      return [
+        { name: 'Home', path: '/' },
+        { name: 'Downloads', path: '/downloads' },
+      ];
+    }
+    if (isCategoriesPage) {
+      return [
+        { name: 'Home', path: '/' },
+        { name: 'Categories', path: '/categories' },
+      ];
+    }
+    return [];
+  })();
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -308,6 +328,21 @@ export function SeoManager() {
       });
     } else {
       document.getElementById('seo-faq-jsonld')?.remove();
+    }
+
+    if (breadcrumbItems.length > 0) {
+      upsertJsonLd('seo-breadcrumb-jsonld', {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: breadcrumbItems.map((item, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: item.name,
+          item: `${origin}${item.path}`,
+        })),
+      });
+    } else {
+      document.getElementById('seo-breadcrumb-jsonld')?.remove();
     }
   }, [location.pathname, location.search]);
 

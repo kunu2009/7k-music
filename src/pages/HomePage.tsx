@@ -836,6 +836,20 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
 
+        <section className="mt-12 glass-surface rounded-2xl border border-blue-200/20 p-6 space-y-3">
+          <h2 className="text-white font-semibold text-xl">About 7K Music</h2>
+          <p className="text-blue-100/80 text-sm leading-7">
+            7K Music is a music discovery web app for streaming and organizing music videos in a fast, app-like
+            interface. You can search songs, browse trending videos, create playlists, and continue playback across
+            sections with queue controls.
+          </p>
+          <p className="text-blue-100/80 text-sm leading-7">
+            The app supports both web and Android users through its Progressive Web App experience and architecture-based
+            APK downloads. If you are looking for a lightweight music video player with modern controls, 7K Music offers
+            search, favorites, categories, and download guidance in one place.
+          </p>
+        </section>
+
         {/* Legal Notice */}
         <div className="mt-12 p-6 glass-surface rounded-2xl">
           <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
