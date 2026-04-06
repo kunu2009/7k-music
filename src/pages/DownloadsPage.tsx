@@ -145,6 +145,50 @@ export const DownloadsPage: React.FC = () => {
             then open the APK again.
           </p>
         </div>
+
+        <section className="glass-surface rounded-2xl border border-blue-200/20 p-5 md:p-6 space-y-4">
+          <h3 className="text-white text-xl font-semibold">Download 7K Music APK Safely</h3>
+          <p className="text-blue-100/80 text-sm leading-7">
+            This page provides official 7K Music Android APK files for multiple CPU architectures so you can install the
+            app on modern phones, older devices, and emulators. If you are not sure which package to use, choose the
+            recommended APK shown at the top of the page. It is selected automatically from your device user agent and
+            is usually the best fit for performance and compatibility.
+          </p>
+          <p className="text-blue-100/80 text-sm leading-7">
+            7K Music helps you discover and stream music videos with a fast, app-like interface. For the best install
+            experience, always download from this official domain and keep your app updated to the latest build listed
+            above. If installation fails, verify available storage, Android version support, and architecture match.
+          </p>
+        </section>
+
+        <section className="glass-surface rounded-2xl border border-blue-200/20 p-5 md:p-6 space-y-4">
+          <h3 className="text-white text-xl font-semibold">APK Download FAQ</h3>
+          <div className="space-y-4 text-sm">
+            <div>
+              <h4 className="text-white font-semibold mb-1">Which APK should I install?</h4>
+              <p className="text-blue-100/80">
+                Install the recommended APK shown at the top. Most new Android phones use arm64-v8a.
+              </p>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-1">Is 7K Music free to download?</h4>
+              <p className="text-blue-100/80">Yes. The APK downloads listed here are free.</p>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-1">Why does Android block APK installation?</h4>
+              <p className="text-blue-100/80">
+                Android may require permission to install unknown apps. Enable that setting for your browser or file
+                manager, then run the APK again.
+              </p>
+            </div>
+            <div>
+              <h4 className="text-white font-semibold mb-1">What if the app does not install?</h4>
+              <p className="text-blue-100/80">
+                Recheck architecture match, available storage, and Android version. Try another ABI build if needed.
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

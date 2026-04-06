@@ -150,6 +150,7 @@ function upsertJsonLd(id: string, value: object) {
 
 export function SeoManager() {
   const location = useLocation();
+  const isDownloadsPage = location.pathname.startsWith('/downloads');
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -264,6 +265,49 @@ export function SeoManager() {
     } else {
       document.getElementById('seo-app-jsonld')?.remove();
       document.getElementById('seo-org-jsonld')?.remove();
+    }
+
+    if (isDownloadsPage) {
+      upsertJsonLd('seo-faq-jsonld', {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'Which APK should I install?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Install the recommended APK shown on the Downloads page. Most modern Android phones use arm64-v8a.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Is 7K Music free to download?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. 7K Music APK downloads from the official Downloads page are free.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Why does Android block APK installation?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Android may require permission to install unknown apps. Enable that permission for your browser or file manager, then install again.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What if the app does not install?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Check architecture compatibility, available storage, and Android version. If needed, download another ABI build.',
+            },
+          },
+        ],
+      });
+    } else {
+      document.getElementById('seo-faq-jsonld')?.remove();
     }
   }, [location.pathname, location.search]);
 
