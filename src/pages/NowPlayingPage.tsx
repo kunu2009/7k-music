@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
@@ -16,6 +16,7 @@ import {
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites } from '@/hooks/useStorage';
 import { triggerHaptic } from '@/utils/feedback';
+import { lyricsApi } from '@/utils/lyrics';
 
 export function NowPlayingPage() {
   const navigate = useNavigate();
@@ -40,6 +41,8 @@ export function NowPlayingPage() {
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [isSeeking, setIsSeeking] = useState(false);
   const [previewTime, setPreviewTime] = useState<number | null>(null);
+  const [lyrics, setLyrics] = useState<string>('');
+  const [lyricsLoading, setLyricsLoading] = useState(false);
 
   if (!currentVideo) {
     navigate('/');
@@ -47,6 +50,32 @@ export function NowPlayingPage() {
   }
 
   const favorite = isFavorite(currentVideo.id);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadLyrics = async () => {
+      setLyrics('');
+      setLyricsLoading(true);
+      try {
+        const text = await lyricsApi.getLyrics(currentVideo.title, currentVideo.channelTitle);
+        if (!mounted) return;
+        setLyrics(text ?? 'Lyrics not found for this track yet.');
+      } catch {
+        if (!mounted) return;
+        setLyrics('Could not load lyrics right now.');
+      } finally {
+        if (mounted) {
+          setLyricsLoading(false);
+        }
+      }
+    };
+
+    loadLyrics();
+    return () => {
+      mounted = false;
+    };
+  }, [currentVideo.id, currentVideo.title, currentVideo.channelTitle]);
 
   const handleToggleFavorite = async () => {
     if (favorite) {
@@ -255,6 +284,20 @@ export function NowPlayingPage() {
             <ListMusic className="w-5 h-5" />
             <span className="text-sm">{queue.length} in queue</span>
           </button>
+        </div>
+      </div>
+
+      {/* Lyrics */}
+      <div className="px-6 sm:px-8 pb-4">
+        <div className="glass-surface rounded-2xl p-4">
+          <h3 className="text-white font-semibold mb-2">Lyrics</h3>
+          {lyricsLoading ? (
+            <p className="text-blue-100/75 text-sm">Loading lyrics...</p>
+          ) : (
+            <p className="text-blue-100/80 text-sm whitespace-pre-wrap leading-6 max-h-52 overflow-auto">
+              {lyrics}
+            </p>
+          )}
         </div>
       </div>
 

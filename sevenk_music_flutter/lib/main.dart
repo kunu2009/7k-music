@@ -60,6 +60,26 @@ class DemoTrack {
       youtubeVideoId: json['youtubeVideoId']?.toString(),
     );
   }
+
+  DemoTrack copyWith({
+    String? id,
+    String? title,
+    String? artist,
+    String? audioUrl,
+    String? artUrl,
+    String? lyrics,
+    String? youtubeVideoId,
+  }) {
+    return DemoTrack(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      audioUrl: audioUrl ?? this.audioUrl,
+      artUrl: artUrl ?? this.artUrl,
+      lyrics: lyrics ?? this.lyrics,
+      youtubeVideoId: youtubeVideoId ?? this.youtubeVideoId,
+    );
+  }
 }
 
 class DemoPlaylist {
@@ -288,6 +308,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   String? _localPlaybackDebug;
   SharedPreferences? _prefs;
   final Map<String, List<DemoTrack>> _discoverShelves = <String, List<DemoTrack>>{};
+  final Map<String, String> _lyricsMemoryCache = <String, String>{};
   
 
   @override
@@ -336,6 +357,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     _player.currentIndexStream.listen((index) {
       if (!mounted || index == null) return;
       setState(() => _trackIndex = index);
+      unawaited(_hydrateLyricsForQueueIndex(index));
     });
 
     _player.loopModeStream.listen((mode) {
@@ -457,7 +479,89 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         if (autoPlay && !targetTrack.id.startsWith('yt-')) {
           _pageController.jumpToPage(2);
         }
+        unawaited(_hydrateLyricsForQueueIndex(safeIndex));
       }
+    }
+  }
+
+  String _lyricsCacheKey(String title, String artist) {
+    return '${title.toLowerCase().trim()}::${artist.toLowerCase().trim()}';
+  }
+
+  bool _needsLyricsFetch(DemoTrack track) {
+    final lyrics = track.lyrics.trim();
+    if (lyrics.isEmpty) return true;
+    return lyrics == 'YouTube music video. Click to play on YouTube.' ||
+        lyrics == 'Local file from your device storage.' ||
+        lyrics == 'Search YouTube or open local files to start playing.';
+  }
+
+  Future<String?> _fetchLyricsFromLrcLib({required String title, required String artist}) async {
+    final query = [title.trim(), artist.trim()].where((item) => item.isNotEmpty).join(' ');
+    if (query.isEmpty) return null;
+
+    final response = await http
+        .get(
+          Uri.https('lrclib.net', '/api/search', {'q': query}),
+          headers: const {'User-Agent': '7KMusicFlutter/1.0 (+https://music.7kc.me)'},
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode != 200) {
+      return null;
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      return null;
+    }
+
+    String? best;
+    for (final item in decoded) {
+      if (item is! Map<String, dynamic>) continue;
+      final synced = item['syncedLyrics']?.toString() ?? '';
+      final plain = item['plainLyrics']?.toString() ?? '';
+      final candidate = synced.trim().isNotEmpty ? synced : plain;
+      if (candidate.trim().isEmpty) continue;
+      best = candidate;
+      if (synced.trim().isNotEmpty) {
+        break;
+      }
+    }
+
+    return best;
+  }
+
+  Future<void> _hydrateLyricsForQueueIndex(int index) async {
+    if (index < 0 || index >= _queue.length) return;
+    final track = _queue[index];
+    if (!_needsLyricsFetch(track)) return;
+
+    final key = _lyricsCacheKey(track.title, track.artist);
+    final cached = _lyricsMemoryCache[key];
+    if (cached != null && cached.trim().isNotEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _queue[index] = _queue[index].copyWith(lyrics: cached);
+      });
+      return;
+    }
+
+    try {
+      final lyrics = await _fetchLyricsFromLrcLib(title: track.title, artist: track.artist);
+      if (!mounted) return;
+      if (lyrics == null || lyrics.trim().isEmpty) {
+        return;
+      }
+
+      _lyricsMemoryCache[key] = lyrics;
+      if (index < 0 || index >= _queue.length) return;
+      if (_queue[index].id != track.id) return;
+      setState(() {
+        _queue[index] = _queue[index].copyWith(lyrics: lyrics);
+      });
+    } catch (_) {
+      // Ignore transient lyric lookup failures.
     }
   }
 
@@ -827,6 +931,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       }
     }
     _pageController.jumpToPage(2);
+    unawaited(_hydrateLyricsForQueueIndex(_trackIndex));
     await _persistUiState();
   }
 
@@ -961,6 +1066,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       });
       _stopYoutubePolling();
       _pageController.jumpToPage(2);
+      unawaited(_hydrateLyricsForQueueIndex(_trackIndex));
       await _persistUiState();
     } catch (error) {
       debugPrint('Local playback failed: $error');
