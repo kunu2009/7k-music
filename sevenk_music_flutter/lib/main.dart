@@ -275,12 +275,14 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _shuffleEnabled = false;
   bool _loadingSource = true;
   bool _discoverSearching = false;
+  bool _discoverShelfLoading = false;
   bool _deviceAudioLoading = false;
   bool _lyricsExpanded = true;
   bool _audioReady = false;
   String? _startupError;
   String? _localPlaybackDebug;
   SharedPreferences? _prefs;
+  final Map<String, List<DemoTrack>> _discoverShelves = <String, List<DemoTrack>>{};
   
 
   @override
@@ -315,6 +317,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
       await _loadQueue(initialIndex: 0, autoPlay: false);
       unawaited(_loadDeviceAudio());
+      unawaited(_loadDiscoverShelves());
     } catch (error) {
       debugPrint('Startup init failed: $error');
       if (mounted) {
@@ -439,7 +442,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           _activeYouTubeVideoId = null;
           _trackIndex = safeIndex;
           _loadingSource = false;
+          if (autoPlay && !targetTrack.id.startsWith('yt-')) {
+            _currentTab = 2;
+          }
         });
+        if (autoPlay && !targetTrack.id.startsWith('yt-')) {
+          _pageController.jumpToPage(2);
+        }
       }
     }
   }
@@ -454,7 +463,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     if (_isYoutubeTrack(_currentTrack)) {
-      await _loadYoutubeTrack(_currentTrack);
+      if (_activeYouTubeVideoId == null) {
+        await _loadYoutubeTrack(_currentTrack);
+      }
       return;
     }
 
@@ -860,7 +871,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _audioReady = true;
         _activeYouTubeVideoId = null;
         _loadingSource = false;
+        _currentTab = 2;
       });
+      _pageController.jumpToPage(2);
       await _persistUiState();
     } catch (error) {
       debugPrint('Local playback failed: $error');
@@ -871,6 +884,71 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _loadingSource = false;
       });
     }
+  }
+
+  Future<List<DemoTrack>> _fetchOnlineTracks(String query) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) {
+      return const <DemoTrack>[];
+    }
+
+    final candidates = <Uri>[
+      Uri.https('music.7kc.me', '/api/search', {'q': normalized, 'maxResults': '25'}),
+      Uri.https('7k-music-7f6u.vercel.app', '/api/search', {'q': normalized, 'maxResults': '25'}),
+      Uri.https('piped.video', '/api/v1/search', {'q': normalized, 'filter': 'videos'}),
+      Uri.https('pipedapi.kavin.rocks', '/api/v1/search', {'q': normalized, 'filter': 'videos'}),
+    ];
+
+    http.Response? response;
+    Object? lastError;
+    for (final uri in candidates) {
+      try {
+        final next = await http.get(uri).timeout(const Duration(seconds: 15));
+        if (next.statusCode == 200) {
+          response = next;
+          break;
+        }
+        lastError = Exception('Search API failed: ${next.statusCode}');
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (response == null) {
+      throw lastError ?? Exception('Search API failed');
+    }
+
+    final decoded = jsonDecode(response.body);
+    final results = decoded is Map<String, dynamic> && decoded['results'] is List
+        ? decoded['results'] as List
+        : const <dynamic>[];
+
+    final parsed = <DemoTrack>[];
+    for (final item in results) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final rawId = item['id']?.toString() ?? item['videoId']?.toString() ?? item['url']?.toString() ?? item['link']?.toString() ?? '';
+      final videoId = _extractYouTubeVideoId(rawId);
+      final title = item['title']?.toString();
+      final artist = item['artist']?.toString() ?? item['uploaderName']?.toString() ?? item['author']?.toString();
+      final thumbnail = item['thumbnail']?.toString() ?? item['thumbnailUrl']?.toString() ?? item['thumbnailUri']?.toString();
+
+      if (videoId.isEmpty || title == null || title.trim().isEmpty) continue;
+
+      parsed.add(
+        DemoTrack(
+          id: 'yt-$videoId',
+          title: title,
+          artist: artist ?? 'Unknown Artist',
+          audioUrl: 'https://www.youtube.com/watch?v=$videoId',
+          artUrl: thumbnail ?? _fallbackArtUrl,
+          lyrics: 'YouTube music video. Click to play on YouTube.',
+          youtubeVideoId: videoId,
+        ),
+      );
+    }
+
+    return parsed;
   }
 
   Future<void> _searchOnlineTracks(String query) async {
@@ -893,61 +971,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
 
     try {
-      final candidates = <Uri>[
-        Uri.https('music.7kc.me', '/api/search', {'q': normalized, 'maxResults': '25'}),
-        Uri.https('7k-music-7f6u.vercel.app', '/api/search', {'q': normalized, 'maxResults': '25'}),
-        Uri.https('piped.video', '/api/v1/search', {'q': normalized, 'filter': 'videos'}),
-        Uri.https('pipedapi.kavin.rocks', '/api/v1/search', {'q': normalized, 'filter': 'videos'}),
-      ];
-
-      http.Response? response;
-      Object? lastError;
-      for (final uri in candidates) {
-        try {
-          final next = await http.get(uri).timeout(const Duration(seconds: 15));
-          if (next.statusCode == 200) {
-            response = next;
-            break;
-          }
-          lastError = Exception('Search API failed: ${next.statusCode}');
-        } catch (error) {
-          lastError = error;
-        }
-      }
-
-      if (response == null) {
-        throw lastError ?? Exception('Search API failed');
-      }
-
-      final decoded = jsonDecode(response.body);
-      final results = decoded is Map<String, dynamic> && decoded['results'] is List
-          ? decoded['results'] as List
-          : const <dynamic>[];
-
-      final parsed = <DemoTrack>[];
-      for (final item in results) {
-        if (item is! Map<String, dynamic>) continue;
-
-        final rawId = item['id']?.toString() ?? item['videoId']?.toString() ?? item['url']?.toString() ?? item['link']?.toString() ?? '';
-        final videoId = _extractYouTubeVideoId(rawId);
-        final title = item['title']?.toString();
-        final artist = item['artist']?.toString() ?? item['uploaderName']?.toString() ?? item['author']?.toString();
-        final thumbnail = item['thumbnail']?.toString() ?? item['thumbnailUrl']?.toString() ?? item['thumbnailUri']?.toString();
-        
-        if (videoId.isEmpty || title == null || title.trim().isEmpty) continue;
-
-        parsed.add(
-          DemoTrack(
-            id: 'yt-$videoId',
-            title: title,
-            artist: artist ?? 'Unknown Artist',
-            audioUrl: 'https://www.youtube.com/watch?v=$videoId',
-            artUrl: thumbnail ?? _fallbackArtUrl,
-            lyrics: 'YouTube music video. Click to play on YouTube.',
-            youtubeVideoId: videoId,
-          ),
-        );
-      }
+      final parsed = await _fetchOnlineTracks(normalized);
 
       if (!mounted) return;
       setState(() {
@@ -1469,6 +1493,44 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     }
   }
 
+  Future<void> _loadDiscoverShelves() async {
+    if (_discoverShelfLoading || _discoverShelves.isNotEmpty) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _discoverShelfLoading = true;
+      });
+    }
+
+    final configs = <Map<String, String>>[
+      {'title': 'Trending Now', 'query': 'trending songs'},
+      {'title': 'Latest Uploads', 'query': 'latest songs'},
+      {'title': 'Top Hits', 'query': 'top songs'},
+    ];
+
+    final shelves = <String, List<DemoTrack>>{};
+    for (final config in configs) {
+      try {
+        final tracks = await _fetchOnlineTracks(config['query']!);
+        if (tracks.isNotEmpty) {
+          shelves[config['title']!] = tracks.take(6).toList();
+        }
+      } catch (error) {
+        debugPrint('Discover shelf load failed for ${config['title']}: $error');
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _discoverShelves
+        ..clear()
+        ..addAll(shelves);
+      _discoverShelfLoading = false;
+    });
+  }
+
   void _applyDiscoverSearch(String value, {bool addToRecent = false}) {
     final normalized = value.trim();
     setState(() {
@@ -1719,6 +1781,85 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
     );
   }
 
+  Widget _buildDiscoverShelf(String title, List<DemoTrack> tracks) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: GoogleFonts.sora(fontSize: 20, fontWeight: FontWeight.w600)),
+              Text('${tracks.length} tracks', style: const TextStyle(color: Color(0xFFB7C7EB), fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 214,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: tracks.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final track = tracks[index];
+                final inQueueIndex = _queue.indexWhere((item) => item.id == track.id);
+                return GestureDetector(
+                  onTap: () => _playOrQueueTrack(track, queueIndex: inQueueIndex >= 0 ? inQueueIndex : null),
+                  child: Container(
+                    width: 148,
+                    decoration: BoxDecoration(
+                      color: const Color(0x281A2B54),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0x2FAFC2FF)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: Image.network(
+                              track.artUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0x2A203869),
+                                child: const Icon(Icons.music_note_rounded, color: Color(0xFFC3D2F5)),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                          child: Text(
+                            track.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
+                          child: Text(
+                            track.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFFB7C7EB), fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDiscoverPage() {
     final filteredTracks = _discoverRemoteTracks;
 
@@ -1731,6 +1872,21 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         const SizedBox(height: 18),
         _heroCard(),
         const SizedBox(height: 16),
+        if (_discoverShelfLoading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                Text('Loading trending and latest music...'),
+              ],
+            ),
+          ),
+        if (_discoverShelves.isNotEmpty) ...[
+          ..._discoverShelves.entries.map((entry) => _buildDiscoverShelf(entry.key, entry.value)),
+          const SizedBox(height: 6),
+        ],
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
@@ -1832,7 +1988,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Text(
-              'No YouTube results yet. Try a different query.',
+              'No YouTube results yet. Try a different query or use the trending sections above.',
               style: TextStyle(color: Color(0xFFB7C7EB)),
             ),
           )
@@ -2337,11 +2493,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             _glassIcon(Icons.skip_previous_rounded, onTap: _previousTrackSafe),
             if (isYoutube)
               GestureDetector(
-                onTap: () async {
-                  if (_activeYouTubeVideoId != null) {
-                    await _loadYoutubeTrack(track);
-                  }
-                },
+                onTap: _activeYouTubeVideoId == null ? () { unawaited(_loadYoutubeTrack(track)); } : null,
                 child: Container(
                   width: 84,
                   height: 84,
@@ -2656,9 +2808,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                   ),
                 ),
               Expanded(
-                child: _loadingSource
-                    ? const Center(child: CircularProgressIndicator())
-                    : PageView(
+                  child: Stack(
+                    children: [
+                      PageView(
                         controller: _pageController,
                         onPageChanged: (index) {
                           setState(() => _currentTab = index);
@@ -2666,6 +2818,13 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
                         },
                         children: pages,
                       ),
+                      if (_loadingSource)
+                        Container(
+                          color: const Color(0x66101022),
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                    ],
+                  ),
               ),
               if (!_loadingSource && _currentTab != 2)
                 _MiniPlayerDock(
