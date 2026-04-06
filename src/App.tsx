@@ -6,6 +6,7 @@ import { NetworkBanner } from '@/components/NetworkBanner';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { PlayerToast } from '@/components/PlayerToast';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
+import { SeoManager } from '@/components/SeoManager';
 import { HomePage } from '@/pages/HomePage';
 import { SearchPage } from '@/pages/SearchPage';
 import { FavoritesPage } from '@/pages/FavoritesPage';
@@ -171,6 +172,7 @@ function PlayerWrapper() {
 
   return (
     <>
+      <SeoManager />
       {/* Routes */}
       <Routes>
         <Route path="/" element={<HomePage />} />
