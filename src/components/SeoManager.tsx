@@ -16,7 +16,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: '7K Music | Play, Discover, Create Music Videos Legally',
       description:
         'Stream trending music videos from YouTube, build playlists, and discover new tracks in a fast Spotify-style PWA.',
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -26,7 +26,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       description:
         'Search songs, artists, and genres to find music videos from YouTube inside 7K Music.',
       noindex: true,
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -35,7 +35,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'Android APK Downloads | 7K Music',
       description:
         'Download the latest 7K Music Android APK for arm64, armv7, or x86_64 devices.',
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -44,7 +44,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'Browse Music Categories | 7K Music',
       description:
         'Explore trending music categories, curated sections, and discovery rails in 7K Music.',
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -53,7 +53,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'Your Favorites | 7K Music',
       description: 'Open your liked music videos and saved tracks in 7K Music.',
       noindex: true,
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -62,7 +62,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'My Music Library | 7K Music',
       description: 'View your saved music, playlists, and offline-ready library items.',
       noindex: true,
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -71,7 +71,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'Playlist Details | 7K Music',
       description: 'Open a playlist and play the tracks inside 7K Music.',
       noindex: true,
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -80,7 +80,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'Playlists | 7K Music',
       description: 'Create, edit, and manage playlists in 7K Music.',
       noindex: true,
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -89,7 +89,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'Now Playing | 7K Music',
       description: 'Control playback, seek through tracks, and manage the queue in 7K Music.',
       noindex: true,
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -98,7 +98,7 @@ function getSeoConfig(pathname: string): SeoConfig {
       title: 'App Settings | 7K Music',
       description: 'Adjust playback, appearance, and app preferences in 7K Music.',
       noindex: true,
-      image: '/7kmusic.png',
+      image: '/favicon.png',
     };
   }
 
@@ -157,7 +157,7 @@ export function SeoManager() {
     const config = getSeoConfig(location.pathname);
     const origin = window.location.origin;
     const canonicalUrl = `${origin}${location.pathname}${location.search}`;
-    const imageUrl = new URL(config.image ?? '/7kmusic.png', origin).toString();
+    const imageUrl = new URL(config.image ?? '/favicon.png', origin).toString();
 
     document.title = config.title;
 
@@ -195,6 +195,10 @@ export function SeoManager() {
       property: 'og:image',
       content: imageUrl,
     });
+    upsertMeta('meta[property="og:image:alt"]', {
+      property: 'og:image:alt',
+      content: '7K Music logo',
+    });
 
     upsertMeta('meta[name="twitter:card"]', {
       name: 'twitter:card',
@@ -212,10 +216,14 @@ export function SeoManager() {
       name: 'twitter:image',
       content: imageUrl,
     });
+    upsertMeta('meta[name="twitter:image:alt"]', {
+      name: 'twitter:image:alt',
+      content: '7K Music logo',
+    });
 
     upsertLink('canonical', canonicalUrl);
-    upsertLink('icon', '/7kmusic.png', { type: 'image/png' });
-    upsertLink('apple-touch-icon', '/7kmusic.png');
+    upsertLink('icon', '/favicon.png', { type: 'image/png' });
+    upsertLink('apple-touch-icon', '/favicon.png');
 
     upsertJsonLd('seo-website-jsonld', {
       '@context': 'https://schema.org',
