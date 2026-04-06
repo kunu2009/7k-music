@@ -270,6 +270,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   final Map<String, List<DemoTrack>> _playlistTracks = {
     for (final playlist in demoPlaylists) playlist.id: List<DemoTrack>.of(playlist.tracks),
   };
+  List<DemoTrack>? _queueBeforeShuffle;
 
   LoopMode _loopMode = LoopMode.off;
   bool _shuffleEnabled = false;
@@ -280,6 +281,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   bool _lyricsExpanded = true;
   bool _audioReady = false;
   bool _youtubePlaying = false;
+  Duration _youtubePosition = Duration.zero;
+  Duration _youtubeDuration = Duration.zero;
+  Timer? _youtubePollTimer;
   String? _startupError;
   String? _localPlaybackDebug;
   SharedPreferences? _prefs;
@@ -447,6 +451,9 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             _currentTab = 2;
           }
         });
+        if (!targetTrack.id.startsWith('yt-')) {
+          _stopYoutubePolling();
+        }
         if (autoPlay && !targetTrack.id.startsWith('yt-')) {
           _pageController.jumpToPage(2);
         }
@@ -733,6 +740,26 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         player.seekTo(0, true);
         player.playVideo();
       }
+      function seekPlayback(offsetSeconds) {
+        if (!player) return;
+        var nextTime = Math.max(0, player.getCurrentTime() + offsetSeconds);
+        player.seekTo(nextTime, true);
+        player.playVideo();
+      }
+      function seekPlaybackTo(positionSeconds) {
+        if (!player) return;
+        player.seekTo(Math.max(0, positionSeconds), true);
+        player.playVideo();
+      }
+      function getPlaybackState() {
+        if (!player) return JSON.stringify({ position: 0, duration: 0, playing: false, state: -1 });
+        return JSON.stringify({
+          position: player.getCurrentTime(),
+          duration: player.getDuration(),
+          playing: player.getPlayerState() === YT.PlayerState.PLAYING,
+          state: player.getPlayerState()
+        });
+      }
     </script>
   </head>
   <body>
@@ -765,6 +792,8 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _audioReady = false;
         _activeYouTubeVideoId = videoId;
         _youtubePlaying = autoplay;
+        _youtubePosition = Duration.zero;
+        _youtubeDuration = Duration.zero;
         _currentTab = 2;
       });
     }
@@ -786,6 +815,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
           _youtubeEmbedHtml(videoId, autoplay: autoplay),
           baseUrl: 'https://www.youtube-nocookie.com',
         );
+        _startYoutubePolling();
       } catch (error) {
         debugPrint('YouTube embed load failed: $error');
         if (mounted) {
@@ -912,15 +942,24 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       }
 
       if (!mounted) return;
+      final localQueue = _deviceSongs
+          .where(_isLikelyMusicSong)
+          .map(_demoTrackFromLocalSong)
+          .toList();
+      final selectedId = localTrack.id;
+      final selectedIndex = localQueue.indexWhere((track) => track.id == selectedId);
       setState(() {
-        _queue = [localTrack];
-        _trackIndex = 0;
+        _queue = localQueue.isEmpty ? [localTrack] : localQueue;
+        _trackIndex = selectedIndex < 0 ? 0 : selectedIndex;
         _audioReady = true;
         _activeYouTubeVideoId = null;
         _youtubePlaying = false;
+        _youtubePosition = Duration.zero;
+        _youtubeDuration = Duration.zero;
         _loadingSource = false;
         _currentTab = 2;
       });
+      _stopYoutubePolling();
       _pageController.jumpToPage(2);
       await _persistUiState();
     } catch (error) {
@@ -932,6 +971,59 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
         _loadingSource = false;
         _youtubePlaying = false;
       });
+    }
+  }
+
+  void _startYoutubePolling() {
+    _youtubePollTimer?.cancel();
+    _youtubePollTimer = Timer.periodic(const Duration(milliseconds: 700), (_) {
+      unawaited(_syncYoutubePlaybackState());
+    });
+  }
+
+  void _stopYoutubePolling() {
+    _youtubePollTimer?.cancel();
+    _youtubePollTimer = null;
+  }
+
+  Future<void> _syncYoutubePlaybackState() async {
+    if (_activeYouTubeVideoId == null || !mounted) return;
+    try {
+      final raw = await _youtubeController.runJavaScriptReturningResult('getPlaybackState();');
+      final text = raw is String ? raw : raw.toString();
+      final decodedText = text.startsWith('"') && text.endsWith('"') ? jsonDecode(text) as String : text;
+      final decoded = jsonDecode(decodedText) as Map<String, dynamic>;
+      final positionSeconds = (decoded['position'] as num?)?.toDouble() ?? 0.0;
+      final durationSeconds = (decoded['duration'] as num?)?.toDouble() ?? 0.0;
+      final playing = decoded['playing'] == true;
+      if (!mounted) return;
+      setState(() {
+        _youtubePosition = Duration(milliseconds: (positionSeconds * 1000).round());
+        _youtubeDuration = Duration(milliseconds: (durationSeconds * 1000).round());
+        _youtubePlaying = playing;
+      });
+    } catch (_) {
+      // Ignore transient WebView state errors while the iframe initializes.
+    }
+  }
+
+  Future<void> _seekYoutubeBy(Duration offset) async {
+    if (_activeYouTubeVideoId == null) return;
+    try {
+      await _youtubeController.runJavaScript('seekPlayback(${offset.inSeconds});');
+      await _syncYoutubePlaybackState();
+    } catch (error) {
+      debugPrint('YouTube seek failed: $error');
+    }
+  }
+
+  Future<void> _seekYoutubeTo(Duration position) async {
+    if (_activeYouTubeVideoId == null) return;
+    try {
+      await _youtubeController.runJavaScript('seekPlaybackTo(${position.inSeconds});');
+      await _syncYoutubePlaybackState();
+    } catch (error) {
+      debugPrint('YouTube seek-to failed: $error');
     }
   }
 
@@ -1064,8 +1156,24 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
       if (existingIndex >= 0) {
         _trackIndex = existingIndex;
       } else {
-        _queue = [..._queue, track];
-        _trackIndex = _queue.length - 1;
+        final discoverIndex = _discoverRemoteTracks.indexWhere((item) => item.id == track.id);
+        if (discoverIndex >= 0) {
+          _queue = List<DemoTrack>.of(_discoverRemoteTracks);
+          _trackIndex = discoverIndex;
+        } else {
+          for (final shelf in _discoverShelves.values) {
+            final shelfIndex = shelf.indexWhere((item) => item.id == track.id);
+            if (shelfIndex >= 0) {
+              _queue = List<DemoTrack>.of(shelf);
+              _trackIndex = shelfIndex;
+              break;
+            }
+          }
+          if (_queue.isEmpty || _queue.indexWhere((item) => item.id == track.id) < 0) {
+            _queue = [..._queue, track];
+            _trackIndex = _queue.length - 1;
+          }
+        }
       }
       await _persistUiState();
       await _loadYoutubeTrack(track);
@@ -1550,10 +1658,29 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
 
   Future<void> _toggleShuffleMode() async {
     final target = !_shuffleEnabled;
-    await _player.setShuffleModeEnabled(target);
     if (target) {
-      await _player.shuffle();
+      if (_queue.length > 1) {
+        final current = _currentTrack;
+        final remainder = _queue.where((track) => track.id != current.id).toList()..shuffle();
+        _queueBeforeShuffle = List<DemoTrack>.of(_queue);
+        _queue = <DemoTrack>[current, ...remainder];
+        _trackIndex = 0;
+      }
+    } else if (_queueBeforeShuffle != null && _queueBeforeShuffle!.isNotEmpty) {
+      final currentId = _currentTrack.id;
+      _queue = List<DemoTrack>.of(_queueBeforeShuffle!);
+      _trackIndex = _queue.indexWhere((track) => track.id == currentId);
+      if (_trackIndex < 0) {
+        _trackIndex = 0;
+      }
+      _queueBeforeShuffle = null;
     }
+    if (mounted) {
+      setState(() {
+        _shuffleEnabled = target;
+      });
+    }
+    await _persistUiState();
   }
 
   Future<void> _loadDiscoverShelves() async {
@@ -2528,11 +2655,50 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
             },
           )
         else
-          Text(
-            _youtubeExternalPlaybackOnly
-                ? 'Playback opens in the YouTube app/browser.'
-                : 'Playing in embedded YouTube view.',
-            style: const TextStyle(color: Color(0xFFB7C7EB)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: const Color(0xFFE3ECFF),
+                  inactiveTrackColor: const Color(0x33FFFFFF),
+                  thumbColor: Colors.white,
+                  trackHeight: 3,
+                ),
+                child: Slider(
+                  min: 0,
+                  max: _youtubeDuration.inMilliseconds > 0 ? _youtubeDuration.inMilliseconds.toDouble() : 1,
+                  value: _youtubePosition.inMilliseconds.clamp(0, _youtubeDuration.inMilliseconds).toDouble(),
+                  onChanged: _youtubeDuration.inMilliseconds > 0
+                      ? (next) => _seekYoutubeTo(Duration(milliseconds: next.toInt()))
+                      : null,
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(_format(_youtubePosition), style: const TextStyle(color: Color(0xFFBBC8E7))),
+                  Text(
+                    _youtubeDuration > Duration.zero ? _format(_youtubeDuration) : '0:00',
+                    style: const TextStyle(color: Color(0xFFBBC8E7)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _glassIcon(Icons.replay_10_rounded, onTap: () => _seekYoutubeBy(const Duration(seconds: -10))),
+                  Text(
+                    _youtubeExternalPlaybackOnly
+                        ? 'Playback opens in the YouTube app/browser.'
+                        : 'Playing in embedded YouTube view.',
+                    style: const TextStyle(color: Color(0xFFB7C7EB)),
+                  ),
+                  _glassIcon(Icons.forward_10_rounded, onTap: () => _seekYoutubeBy(const Duration(seconds: 10))),
+                ],
+              ),
+            ],
           ),
         if (isYoutube && _activeYouTubeVideoId != null) ...[
           const SizedBox(height: 10),
@@ -2817,6 +2983,7 @@ class _SevenKMusicShellState extends State<SevenKMusicShell> {
   void dispose() {
     _discoverSearchController.dispose();
     _pageController.dispose();
+    _stopYoutubePolling();
     _player.dispose();
     super.dispose();
   }
