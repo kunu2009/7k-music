@@ -17,6 +17,7 @@ import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites } from '@/hooks/useStorage';
 import { triggerHaptic } from '@/utils/feedback';
 import { lyricsApi } from '@/utils/lyrics';
+import { musicBrainzApi } from '@/utils/musicbrainz';
 
 export function NowPlayingPage() {
   const navigate = useNavigate();
@@ -43,6 +44,14 @@ export function NowPlayingPage() {
   const [previewTime, setPreviewTime] = useState<number | null>(null);
   const [lyrics, setLyrics] = useState<string>('');
   const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [metadata, setMetadata] = useState<{
+    releaseTitle?: string;
+    releaseDate?: string;
+    country?: string;
+    genres?: string[];
+    url?: string;
+  } | null>(null);
+  const [metadataLoading, setMetadataLoading] = useState(false);
 
   if (!currentVideo) {
     navigate('/');
@@ -72,6 +81,38 @@ export function NowPlayingPage() {
     };
 
     loadLyrics();
+    return () => {
+      mounted = false;
+    };
+  }, [currentVideo.id, currentVideo.title, currentVideo.channelTitle]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadMetadata = async () => {
+      setMetadata(null);
+      setMetadataLoading(true);
+      try {
+        const result = await musicBrainzApi.getMetadata(currentVideo.title, currentVideo.channelTitle);
+        if (!mounted) return;
+        setMetadata(result ? {
+          releaseTitle: result.releaseTitle,
+          releaseDate: result.releaseDate,
+          country: result.country,
+          genres: result.genres,
+          url: result.url,
+        } : null);
+      } catch {
+        if (!mounted) return;
+        setMetadata(null);
+      } finally {
+        if (mounted) {
+          setMetadataLoading(false);
+        }
+      }
+    };
+
+    loadMetadata();
     return () => {
       mounted = false;
     };
@@ -289,14 +330,69 @@ export function NowPlayingPage() {
 
       {/* Lyrics */}
       <div className="px-6 sm:px-8 pb-4">
-        <div className="glass-surface rounded-2xl p-4">
-          <h3 className="text-white font-semibold mb-2">Lyrics</h3>
-          {lyricsLoading ? (
-            <p className="text-blue-100/75 text-sm">Loading lyrics...</p>
-          ) : (
-            <p className="text-blue-100/80 text-sm whitespace-pre-wrap leading-6 max-h-52 overflow-auto">
-              {lyrics}
-            </p>
+        <div className="space-y-3">
+          {metadata && (
+            <div className="glass-surface rounded-2xl p-4 border border-blue-200/10">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h3 className="text-white font-semibold">Track Facts</h3>
+                {metadata.url && (
+                  <a
+                    href={metadata.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-blue-100/70 hover:text-white transition"
+                  >
+                    Open MusicBrainz
+                  </a>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {metadata.releaseTitle && (
+                  <div className="rounded-xl bg-white/5 px-3 py-2">
+                    <div className="text-blue-100/60 text-xs uppercase tracking-wide">Release</div>
+                    <div className="text-white mt-1 line-clamp-2">{metadata.releaseTitle}</div>
+                  </div>
+                )}
+                {metadata.releaseDate && (
+                  <div className="rounded-xl bg-white/5 px-3 py-2">
+                    <div className="text-blue-100/60 text-xs uppercase tracking-wide">First release</div>
+                    <div className="text-white mt-1">{metadata.releaseDate}</div>
+                  </div>
+                )}
+                {metadata.country && (
+                  <div className="rounded-xl bg-white/5 px-3 py-2">
+                    <div className="text-blue-100/60 text-xs uppercase tracking-wide">Country</div>
+                    <div className="text-white mt-1">{metadata.country}</div>
+                  </div>
+                )}
+                {metadata.genres && metadata.genres.length > 0 && (
+                  <div className="rounded-xl bg-white/5 px-3 py-2 sm:col-span-2">
+                    <div className="text-blue-100/60 text-xs uppercase tracking-wide">Genres</div>
+                    <div className="text-white mt-1 flex flex-wrap gap-2">
+                      {metadata.genres.map((genre) => (
+                        <span key={genre} className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-50 text-xs">
+                          {genre}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="glass-surface rounded-2xl p-4">
+            <h3 className="text-white font-semibold mb-2">Lyrics</h3>
+            {lyricsLoading ? (
+              <p className="text-blue-100/75 text-sm">Loading lyrics...</p>
+            ) : (
+              <p className="text-blue-100/80 text-sm whitespace-pre-wrap leading-6 max-h-52 overflow-auto">
+                {lyrics}
+              </p>
+            )}
+          </div>
+          {metadataLoading && !metadata && (
+            <p className="text-xs text-blue-100/55 px-1">Loading track facts...</p>
           )}
         </div>
       </div>
