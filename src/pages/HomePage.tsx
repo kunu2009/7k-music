@@ -31,6 +31,7 @@ import {
 const HOME_CACHE_KEY = 'home-page-cache-v2';
 const HOME_PREFERENCES_KEY = 'home-preferences-v1';
 const HOME_ONBOARDING_DONE_KEY = 'home-onboarding-done-v1';
+const HOME_NOT_INTERESTED_KEY = 'home-not-interested-v1';
 
 const HOME_GENRES = [
   'Pop',
@@ -86,6 +87,11 @@ interface HomeSection {
   reasonChips?: string[];
 }
 
+interface HomeNotInterested {
+  videoIds: string[];
+  channels: string[];
+}
+
 function dedupeVideos(videos: YouTubeVideo[]) {
   const seen = new Set<string>();
   return videos.filter((video) => {
@@ -114,6 +120,10 @@ function topN(values: string[], count: number) {
 
 function compactTitle(title: string) {
   return title.split(/[\-|\|•]/)[0]?.trim() || title.trim();
+}
+
+function normalizeChannel(channelTitle: string) {
+  return channelTitle.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 function PreferenceChip({
@@ -248,6 +258,7 @@ function HorizontalVideoRail({
   onFavorite,
   isFavorite,
   onAddToPlaylist,
+  onNotInterested,
 }: {
   section: HomeSection;
   loading: boolean;
@@ -257,6 +268,7 @@ function HorizontalVideoRail({
   onFavorite: (video: YouTubeVideo) => void;
   isFavorite: (videoId: string) => boolean;
   onAddToPlaylist: (video: YouTubeVideo) => void;
+  onNotInterested?: (video: YouTubeVideo) => void;
 }) {
   const scrollContainerId = `rail-${section.id}`;
 
@@ -348,6 +360,7 @@ function HorizontalVideoRail({
               onFavorite={onFavorite}
               isFavorite={isFavorite(video.id)}
               onAddToPlaylist={onAddToPlaylist}
+              onNotInterested={onNotInterested}
             />
           ))}
         </div>
@@ -364,6 +377,7 @@ function HorizontalVideoRail({
                 onFavorite={onFavorite}
                 isFavorite={isFavorite(video.id)}
                 onAddToPlaylist={onAddToPlaylist}
+                onNotInterested={onNotInterested}
               />
             </div>
           ))}
@@ -385,6 +399,7 @@ export const HomePage: React.FC = () => {
   const [draftPreferences, setDraftPreferences] = useState<HomePreferences>({ genres: [], artists: [], songs: [] });
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = useState<YouTubeVideo | null>(null);
+  const [notInterested, setNotInterested] = useState<HomeNotInterested>({ videoIds: [], channels: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -392,6 +407,12 @@ export const HomePage: React.FC = () => {
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
   const { recentlyPlayed } = useRecentlyPlayed();
   const { playlists, addToPlaylist, createPlaylist } = usePlaylists();
+
+  const isHiddenVideo = (video: YouTubeVideo, rules = notInterested) =>
+    rules.videoIds.includes(video.id) || rules.channels.includes(normalizeChannel(video.channelTitle));
+
+  const filterHiddenVideos = (videos: YouTubeVideo[], rules = notInterested) =>
+    videos.filter((video) => !isHiddenVideo(video, rules));
 
   const recommendedAbi = useMemo<AndroidAbi>(() => {
     if (typeof navigator === 'undefined') {
@@ -454,6 +475,14 @@ export const HomePage: React.FC = () => {
 
   useEffect(() => {
     try {
+      const storedNotInterested = localStorage.getItem(HOME_NOT_INTERESTED_KEY);
+      if (storedNotInterested) {
+        const parsedNotInterested = JSON.parse(storedNotInterested) as HomeNotInterested;
+        if (Array.isArray(parsedNotInterested.videoIds) && Array.isArray(parsedNotInterested.channels)) {
+          setNotInterested(parsedNotInterested);
+        }
+      }
+
       const cached = localStorage.getItem(HOME_CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached) as {
@@ -465,11 +494,14 @@ export const HomePage: React.FC = () => {
         };
 
         if (Array.isArray(parsed.trending) && parsed.trending.length > 0) {
-          setTrendingVideos(parsed.trending);
-          setLatestVideos(parsed.latest || []);
-          setFeaturedVideos(parsed.featured || []);
-          setBecausePlayedVideos(parsed.becausePlayed || []);
-          setRecommendedVideos(parsed.recommended || []);
+          const activeRules = storedNotInterested
+            ? (JSON.parse(storedNotInterested) as HomeNotInterested)
+            : { videoIds: [], channels: [] };
+          setTrendingVideos(filterHiddenVideos(parsed.trending, activeRules));
+          setLatestVideos(filterHiddenVideos(parsed.latest || [], activeRules));
+          setFeaturedVideos(filterHiddenVideos(parsed.featured || [], activeRules));
+          setBecausePlayedVideos(filterHiddenVideos(parsed.becausePlayed || [], activeRules));
+          setRecommendedVideos(filterHiddenVideos(parsed.recommended || [], activeRules));
           setLoading(false);
         }
       }
@@ -590,6 +622,7 @@ export const HomePage: React.FC = () => {
   ) => {
     const activePreferences = nextPreferences !== undefined ? nextPreferences : preferences;
     const { explainability } = getRecommendationSignals(activePreferences);
+    const activeRules = notInterested;
 
     try {
       setLoading(true);
@@ -598,13 +631,13 @@ export const HomePage: React.FC = () => {
       const recommended = await youtubeApi.searchMusicVideos(buildRecommendedQuery(activePreferences), 16);
       const becausePlayed = await buildBecausePlayedVideos();
       setRecommendationChips(explainability);
-      setBecausePlayedVideos(becausePlayed);
+      setBecausePlayedVideos(filterHiddenVideos(becausePlayed, activeRules));
 
       if (refreshRecommendedOnly) {
         const normalizedRecommendedOnly = activePreferences
           ? dedupeVideos(recommended)
           : dedupeVideos(recommended).slice(0, 10);
-        setRecommendedVideos(normalizedRecommendedOnly);
+        setRecommendedVideos(filterHiddenVideos(normalizedRecommendedOnly, activeRules));
         return;
       }
 
@@ -622,11 +655,11 @@ export const HomePage: React.FC = () => {
         ? dedupeVideos(recommended)
         : dedupeVideos(recommended).slice(0, 10);
 
-      setTrendingVideos(dedupeVideos(trending));
-      setLatestVideos(dedupeVideos(normalizedLatest));
-      setFeaturedVideos(dedupeVideos(featured));
-      setBecausePlayedVideos(becausePlayed);
-      setRecommendedVideos(normalizedRecommended);
+      setTrendingVideos(filterHiddenVideos(dedupeVideos(trending), activeRules));
+      setLatestVideos(filterHiddenVideos(dedupeVideos(normalizedLatest), activeRules));
+      setFeaturedVideos(filterHiddenVideos(dedupeVideos(featured), activeRules));
+      setBecausePlayedVideos(filterHiddenVideos(becausePlayed, activeRules));
+      setRecommendedVideos(filterHiddenVideos(normalizedRecommended, activeRules));
 
       localStorage.setItem(
         HOME_CACHE_KEY,
@@ -663,6 +696,29 @@ export const HomePage: React.FC = () => {
 
   const handleAddToPlaylist = async (video: YouTubeVideo) => {
     setSelectedVideoForPlaylist(video);
+  };
+
+  const handleNotInterested = (video: YouTubeVideo) => {
+    const next: HomeNotInterested = {
+      videoIds: [...new Set([...notInterested.videoIds, video.id])],
+      channels: [...new Set([...notInterested.channels, normalizeChannel(video.channelTitle)])],
+    };
+
+    setNotInterested(next);
+    localStorage.setItem(HOME_NOT_INTERESTED_KEY, JSON.stringify(next));
+
+    setTrendingVideos((prev) => prev.filter((item) => !isHiddenVideo(item, next)));
+    setLatestVideos((prev) => prev.filter((item) => !isHiddenVideo(item, next)));
+    setFeaturedVideos((prev) => prev.filter((item) => !isHiddenVideo(item, next)));
+    setBecausePlayedVideos((prev) => prev.filter((item) => !isHiddenVideo(item, next)));
+    setRecommendedVideos((prev) => prev.filter((item) => !isHiddenVideo(item, next)));
+  };
+
+  const handleResetNotInterested = () => {
+    const cleared = { videoIds: [], channels: [] };
+    setNotInterested(cleared);
+    localStorage.removeItem(HOME_NOT_INTERESTED_KEY);
+    loadHomeSections();
   };
 
   const handleSelectPlaylist = async (playlistId: string) => {
@@ -752,6 +808,16 @@ export const HomePage: React.FC = () => {
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
+
+              {notInterested.videoIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleResetNotInterested}
+                  className="px-4 py-2 rounded-full border border-blue-200/30 text-sm text-blue-100/90 hover:bg-blue-500/15 transition"
+                >
+                  Reset Hidden
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -784,6 +850,7 @@ export const HomePage: React.FC = () => {
                 onFavorite={handleFavorite}
                 isFavorite={isFavorite}
                 onAddToPlaylist={handleAddToPlaylist}
+                onNotInterested={handleNotInterested}
               />
             ))}
           </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { YouTubeVideo } from '@/types';
 import { youtubeApi } from '@/utils/youtube';
-import { Heart, Play, ListPlus } from 'lucide-react';
+import { Heart, Play, ListPlus, EyeOff } from 'lucide-react';
 
 interface VideoCardProps {
   video: YouTubeVideo;
@@ -9,6 +9,7 @@ interface VideoCardProps {
   onFavorite?: (video: YouTubeVideo) => void;
   isFavorite?: boolean;
   onAddToPlaylist?: (video: YouTubeVideo) => void;
+  onNotInterested?: (video: YouTubeVideo) => void;
 }
 
 export const VideoCard: React.FC<VideoCardProps> = ({ 
@@ -17,6 +18,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   onFavorite,
   isFavorite = false,
   onAddToPlaylist,
+  onNotInterested,
 }) => {
   return (
     <div className="group relative glass-surface rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer motion-fade-up interactive-lift">
@@ -91,6 +93,20 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 aria-label="Add to playlist"
               >
                 <ListPlus className="w-4 h-4 text-blue-100/80" />
+              </button>
+            )}
+
+            {onNotInterested && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNotInterested(video);
+                }}
+                className="p-1.5 hover:bg-blue-500/30 rounded-full transition-colors"
+                aria-label="Not interested"
+                title="Not interested"
+              >
+                <EyeOff className="w-4 h-4 text-blue-100/80" />
               </button>
             )}
           </div>
