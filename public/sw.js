@@ -1,8 +1,20 @@
 const STATIC_CACHE = '7k-static-v1';
 const IMAGE_CACHE = '7k-images-v1';
 const API_CACHE = '7k-api-v1';
+const ASSET_CACHE = '7k-assets-v1';
 
-const PRECACHE_URLS = ['/', '/index.html', '/offline.html', '/manifest.webmanifest', '/7kmusic.png'];
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/offline.html',
+  '/manifest.webmanifest',
+  '/7kmusic.png',
+  '/favicon.png',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/icons/icon-maskable-192x192.png',
+  '/icons/icon-maskable-512x512.png',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -15,9 +27,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys
-          .filter((key) => ![STATIC_CACHE, IMAGE_CACHE, API_CACHE].includes(key))
-          .map((key) => caches.delete(key))
+        keys.filter((key) => ![STATIC_CACHE, IMAGE_CACHE, API_CACHE, ASSET_CACHE].includes(key)).map((key) => caches.delete(key))
       )
     )
   );
@@ -38,13 +48,36 @@ self.addEventListener('fetch', (event) => {
         fetch(request)
           .then((response) => {
             const copy = response.clone();
-            caches.open(STATIC_CACHE).then((cache) => cache.put('/index.html', copy));
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request.url, copy));
             return response;
           })
           .catch(async () => {
-            const cachedPage = await caches.match(request);
-            return cachedPage || caches.match('/offline.html');
+            const cachedPage = await caches.match(request.url);
+            if (cachedPage) {
+              return cachedPage;
+            }
+            const indexPage = await caches.match('/index.html');
+            return indexPage || caches.match('/offline.html');
           })
+      );
+      return;
+    }
+
+    if (request.destination === 'style' || request.destination === 'script' || request.destination === 'worker' || request.destination === 'font') {
+      event.respondWith(
+        caches.open(ASSET_CACHE).then(async (cache) => {
+          const cached = await cache.match(request);
+          const networkFetch = fetch(request)
+            .then((response) => {
+              if (response && response.status === 200) {
+                cache.put(request, response.clone());
+              }
+              return response;
+            })
+            .catch(() => cached || caches.match('/index.html'));
+
+          return cached || networkFetch;
+        })
       );
       return;
     }
