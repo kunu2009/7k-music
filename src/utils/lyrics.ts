@@ -5,6 +5,19 @@ interface LyricsResponse {
   source?: string;
   trackName?: string;
   artistName?: string;
+  suggestions?: LyricsSuggestion[];
+}
+
+export interface LyricsSuggestion {
+  trackName: string;
+  artistName: string;
+  albumName?: string;
+  synced?: boolean;
+}
+
+export interface LyricsLookupResult {
+  lyrics: string | null;
+  suggestions: LyricsSuggestion[];
 }
 
 interface LyricsCachePayload {
@@ -46,12 +59,14 @@ function setCachedLyrics(track: string, artist: string, lyrics: string) {
 }
 
 export const lyricsApi = {
-  async getLyrics(track: string, artist: string): Promise<string | null> {
-    if (!track.trim()) return null;
+  async lookupLyrics(track: string, artist: string): Promise<LyricsLookupResult> {
+    if (!track.trim()) {
+      return { lyrics: null, suggestions: [] };
+    }
 
     const cached = getCachedLyrics(track, artist);
     if (cached) {
-      return cached;
+      return { lyrics: cached, suggestions: [] };
     }
 
     const params = new URLSearchParams({ track: track.trim() });
@@ -66,10 +81,21 @@ export const lyricsApi = {
 
     const data = (await response.json()) as LyricsResponse;
     if (!data.found || !data.lyrics) {
-      return null;
+      return {
+        lyrics: null,
+        suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
+      };
     }
 
     setCachedLyrics(track, artist, data.lyrics);
-    return data.lyrics;
+    return {
+      lyrics: data.lyrics,
+      suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
+    };
+  },
+
+  async getLyrics(track: string, artist: string): Promise<string | null> {
+    const result = await this.lookupLyrics(track, artist);
+    return result.lyrics;
   },
 };

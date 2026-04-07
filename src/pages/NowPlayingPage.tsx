@@ -16,7 +16,7 @@ import {
 import { usePlayer } from '@/context/PlayerContext';
 import { useFavorites } from '@/hooks/useStorage';
 import { triggerHaptic } from '@/utils/feedback';
-import { lyricsApi } from '@/utils/lyrics';
+import { LyricsSuggestion, lyricsApi } from '@/utils/lyrics';
 import { musicBrainzApi } from '@/utils/musicbrainz';
 
 export function NowPlayingPage() {
@@ -44,6 +44,8 @@ export function NowPlayingPage() {
   const [previewTime, setPreviewTime] = useState<number | null>(null);
   const [lyrics, setLyrics] = useState<string>('');
   const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [lyricsSuggestions, setLyricsSuggestions] = useState<LyricsSuggestion[]>([]);
+  const [pickingSuggestion, setPickingSuggestion] = useState(false);
   const [metadata, setMetadata] = useState<{
     releaseTitle?: string;
     releaseDate?: string;
@@ -65,14 +67,17 @@ export function NowPlayingPage() {
 
     const loadLyrics = async () => {
       setLyrics('');
+      setLyricsSuggestions([]);
       setLyricsLoading(true);
       try {
-        const text = await lyricsApi.getLyrics(currentVideo.title, currentVideo.channelTitle);
+        const result = await lyricsApi.lookupLyrics(currentVideo.title, currentVideo.channelTitle);
         if (!mounted) return;
-        setLyrics(text ?? 'Lyrics not found for this track yet.');
+        setLyrics(result.lyrics ?? 'Lyrics not found for this track yet.');
+        setLyricsSuggestions(result.suggestions);
       } catch {
         if (!mounted) return;
         setLyrics('Could not load lyrics right now.');
+        setLyricsSuggestions([]);
       } finally {
         if (mounted) {
           setLyricsLoading(false);
@@ -126,6 +131,18 @@ export function NowPlayingPage() {
     }
   };
 
+  const handlePickSuggestion = async (suggestion: LyricsSuggestion) => {
+    setPickingSuggestion(true);
+    try {
+      const picked = await lyricsApi.getLyrics(suggestion.trackName, suggestion.artistName);
+      setLyrics(picked ?? 'Lyrics not found for the selected suggestion.');
+    } catch {
+      setLyrics('Could not load lyrics for the selected suggestion.');
+    } finally {
+      setPickingSuggestion(false);
+    }
+  };
+
   const calculateSeekTime = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const pointerX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
@@ -169,7 +186,7 @@ export function NowPlayingPage() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 text-white flex flex-col overflow-y-auto bg-[radial-gradient(circle_at_10%_0%,rgba(125,157,255,0.35),transparent_40%),radial-gradient(circle_at_90%_0%,rgba(71,119,255,0.28),transparent_36%),linear-gradient(180deg,#070b18,#0d1734_55%,#090f22)]">
+    <div className="min-h-screen text-white flex flex-col overflow-y-auto bg-[radial-gradient(circle_at_10%_0%,rgba(125,157,255,0.35),transparent_40%),radial-gradient(circle_at_90%_0%,rgba(71,119,255,0.28),transparent_36%),linear-gradient(180deg,#070b18,#0d1734_55%,#090f22)]">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-5">
         <button
@@ -191,6 +208,7 @@ export function NowPlayingPage() {
         <div className="mx-auto w-full max-w-[720px] aspect-video rounded-[28px] glass-surface relative overflow-hidden">
           <div className="absolute -top-16 -left-16 w-48 h-48 bg-blue-500/30 blur-3xl" />
           <div className="absolute -bottom-12 -right-12 w-52 h-52 bg-cyan-400/20 blur-3xl" />
+          <div id="youtube-player-host" className="absolute inset-0 z-[1]" />
           {isLoadingState && (
             <div className="absolute inset-0 p-4 animate-pulse">
               <div className="w-full h-full rounded-2xl bg-white/10" />
@@ -386,9 +404,36 @@ export function NowPlayingPage() {
             {lyricsLoading ? (
               <p className="text-blue-100/75 text-sm">Loading lyrics...</p>
             ) : (
-              <p className="text-blue-100/80 text-sm whitespace-pre-wrap leading-6 max-h-52 overflow-auto">
-                {lyrics}
-              </p>
+              <>
+                <p className="text-blue-100/80 text-sm whitespace-pre-wrap leading-6 max-h-52 overflow-auto">
+                  {lyrics}
+                </p>
+                {lyrics.startsWith('Lyrics not found') && lyricsSuggestions.length > 0 && (
+                  <div className="mt-3 border-t border-blue-200/15 pt-3">
+                    <p className="text-xs text-blue-100/70 mb-2">Try one of these likely matches:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {lyricsSuggestions.slice(0, 5).map((item, index) => {
+                        const key = `${item.trackName}-${item.artistName}-${index}`;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            disabled={pickingSuggestion}
+                            onClick={() => handlePickSuggestion(item)}
+                            className="text-left px-3 py-2 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 transition disabled:opacity-60"
+                          >
+                            <div className="text-xs text-white">{item.trackName}</div>
+                            <div className="text-[11px] text-blue-100/75">{item.artistName}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {pickingSuggestion && (
+                      <p className="text-xs text-blue-100/60 mt-2">Loading selected lyrics...</p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
           {metadataLoading && !metadata && (

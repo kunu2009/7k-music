@@ -76,17 +76,27 @@ function PlayerWrapper() {
     const playerContainer = document.getElementById('youtube-player');
     if (!playerContainer) return;
 
-    if (isNowPlayingPage && currentVideo) {
-      playerContainer.style.position = 'fixed';
-      playerContainer.style.top = '72px';
-      playerContainer.style.left = '50%';
-      playerContainer.style.transform = 'translateX(-50%)';
-      playerContainer.style.width = 'min(92vw, 720px)';
-      playerContainer.style.height = 'min(52vw, 405px)';
+    const playerHost = document.getElementById('youtube-player-host');
+
+    if (isNowPlayingPage && currentVideo && playerHost) {
+      if (playerContainer.parentElement !== playerHost) {
+        playerHost.appendChild(playerContainer);
+      }
+
+      playerContainer.style.position = 'absolute';
+      playerContainer.style.top = '0';
+      playerContainer.style.left = '0';
+      playerContainer.style.transform = 'none';
+      playerContainer.style.width = '100%';
+      playerContainer.style.height = '100%';
       playerContainer.style.opacity = '1';
       playerContainer.style.pointerEvents = 'auto';
-      playerContainer.style.zIndex = '60';
+      playerContainer.style.zIndex = '1';
       return;
+    }
+
+    if (playerContainer.parentElement !== document.body) {
+      document.body.appendChild(playerContainer);
     }
 
     playerContainer.style.position = 'fixed';
@@ -239,8 +249,8 @@ function App() {
     return () => {
       // Cleanup on unmount
       const div = document.getElementById('youtube-player');
-      if (div && div.parentNode === document.body) {
-        document.body.removeChild(div);
+      if (div && div.parentNode) {
+        div.parentNode.removeChild(div);
       }
     };
   }, []);
