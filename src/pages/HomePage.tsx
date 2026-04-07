@@ -377,6 +377,7 @@ export const HomePage: React.FC = () => {
   const [trendingVideos, setTrendingVideos] = useState<YouTubeVideo[]>([]);
   const [featuredVideos, setFeaturedVideos] = useState<YouTubeVideo[]>([]);
   const [latestVideos, setLatestVideos] = useState<YouTubeVideo[]>([]);
+  const [becausePlayedVideos, setBecausePlayedVideos] = useState<YouTubeVideo[]>([]);
   const [recommendedVideos, setRecommendedVideos] = useState<YouTubeVideo[]>([]);
   const [recommendationChips, setRecommendationChips] = useState<string[]>([]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -417,6 +418,16 @@ export const HomePage: React.FC = () => {
         reasonChips: recommendationChips,
       },
       {
+        id: 'because-played',
+        title: 'Because You Played',
+        subtitle: recentlyPlayed.length > 0
+          ? 'More tracks related to your latest listening'
+          : 'Play some tracks to unlock related recommendations',
+        icon: <Sparkles className="w-5 h-5 text-cyan-100" />,
+        videos: becausePlayedVideos,
+        reasonChips: topN(recentlyPlayed.slice(0, 6).map((video) => compactTitle(video.title)), 3),
+      },
+      {
         id: 'trending',
         title: 'Trending Right Now',
         subtitle: 'Most popular tracks people are playing today',
@@ -438,7 +449,7 @@ export const HomePage: React.FC = () => {
         videos: featuredVideos,
       },
     ],
-    [featuredVideos, latestVideos, preferences, recommendationChips, recommendedVideos, trendingVideos]
+    [becausePlayedVideos, featuredVideos, latestVideos, preferences, recommendationChips, recommendedVideos, recentlyPlayed, trendingVideos]
   );
 
   useEffect(() => {
@@ -449,6 +460,7 @@ export const HomePage: React.FC = () => {
           trending?: YouTubeVideo[];
           latest?: YouTubeVideo[];
           featured?: YouTubeVideo[];
+          becausePlayed?: YouTubeVideo[];
           recommended?: YouTubeVideo[];
         };
 
@@ -456,6 +468,7 @@ export const HomePage: React.FC = () => {
           setTrendingVideos(parsed.trending);
           setLatestVideos(parsed.latest || []);
           setFeaturedVideos(parsed.featured || []);
+          setBecausePlayedVideos(parsed.becausePlayed || []);
           setRecommendedVideos(parsed.recommended || []);
           setLoading(false);
         }
@@ -558,6 +571,19 @@ export const HomePage: React.FC = () => {
     return composite ? `${composite} official music` : 'best music mix 2026';
   };
 
+  const buildBecausePlayedVideos = async () => {
+    const seedVideos = dedupeVideos([...recentlyPlayed.slice(0, 3), ...favorites.slice(0, 2)]).slice(0, 3);
+
+    if (seedVideos.length === 0) {
+      return [] as YouTubeVideo[];
+    }
+
+    const related = await Promise.all(seedVideos.map((video) => youtubeApi.getRelatedVideos(video.id, 8)));
+    const flattened = dedupeVideos(related.flat());
+    const seedIds = new Set(seedVideos.map((video) => video.id));
+    return flattened.filter((video) => !seedIds.has(video.id)).slice(0, 16);
+  };
+
   const loadHomeSections = async (
     nextPreferences?: HomePreferences | null,
     refreshRecommendedOnly = false
@@ -570,7 +596,9 @@ export const HomePage: React.FC = () => {
       setError(null);
 
       const recommended = await youtubeApi.searchMusicVideos(buildRecommendedQuery(activePreferences), 16);
+      const becausePlayed = await buildBecausePlayedVideos();
       setRecommendationChips(explainability);
+      setBecausePlayedVideos(becausePlayed);
 
       if (refreshRecommendedOnly) {
         const normalizedRecommendedOnly = activePreferences
@@ -597,6 +625,7 @@ export const HomePage: React.FC = () => {
       setTrendingVideos(dedupeVideos(trending));
       setLatestVideos(dedupeVideos(normalizedLatest));
       setFeaturedVideos(dedupeVideos(featured));
+      setBecausePlayedVideos(becausePlayed);
       setRecommendedVideos(normalizedRecommended);
 
       localStorage.setItem(
@@ -605,6 +634,7 @@ export const HomePage: React.FC = () => {
           trending: dedupeVideos(trending),
           latest: dedupeVideos(normalizedLatest),
           featured: dedupeVideos(featured),
+          becausePlayed,
           recommended: normalizedRecommended,
           cachedAt: Date.now(),
         })

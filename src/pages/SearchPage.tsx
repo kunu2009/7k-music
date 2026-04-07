@@ -11,10 +11,64 @@ import { Search as SearchIcon } from 'lucide-react';
 
 const SEARCH_CACHE_PREFIX = 'search-cache-v1:';
 
+const SEARCH_NOISE_TERMS = [
+  'official',
+  'video',
+  'lyrics',
+  'lyric',
+  'audio',
+  'live',
+  'bass',
+  'boosted',
+  '8d',
+  'slowed',
+  'reverb',
+  'remix',
+];
+
+function sanitizeSearchQuery(query: string) {
+  return query
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildFallbackQueries(query: string) {
+  const clean = sanitizeSearchQuery(query);
+  const tokens = clean.split(' ').filter(Boolean);
+  const withoutNoise = tokens.filter((token) => !SEARCH_NOISE_TERMS.includes(token));
+  const shorter = withoutNoise.length > 2 ? withoutNoise.slice(0, withoutNoise.length - 1) : withoutNoise;
+
+  const candidates = [
+    query.trim(),
+    clean,
+    withoutNoise.join(' '),
+    shorter.join(' '),
+    `${withoutNoise.join(' ')} official audio`.trim(),
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return [...new Set(candidates)];
+}
+
+function dedupeVideos(videos: YouTubeVideo[]) {
+  const seen = new Set<string>();
+  return videos.filter((video) => {
+    if (seen.has(video.id)) return false;
+    seen.add(video.id);
+    return true;
+  });
+}
+
 export const SearchPage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<YouTubeVideo[]>([]);
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = useState<YouTubeVideo | null>(null);
   const [lastQuery, setLastQuery] = useState('');
+  const [searchHint, setSearchHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +77,33 @@ export const SearchPage: React.FC = () => {
   const { addFavorite, removeFavorite, isFavorite } = useFavorites();
   const { playlists, addToPlaylist, createPlaylist } = usePlaylists();
 
+  const searchWithFallback = async (query: string) => {
+    const variants = buildFallbackQueries(query);
+    let combined: YouTubeVideo[] = [];
+    let usedFallback = false;
+
+    for (let index = 0; index < variants.length; index += 1) {
+      const variant = variants[index];
+      const results = await youtubeApi.searchMusicVideos(variant, index === 0 ? 20 : 12);
+      if (index > 0 && results.length > 0) {
+        usedFallback = true;
+      }
+      combined = dedupeVideos([...combined, ...results]);
+      if (combined.length >= 20) {
+        break;
+      }
+      if (index === 0 && combined.length >= 6) {
+        break;
+      }
+    }
+
+    return {
+      results: combined.slice(0, 20),
+      usedFallback,
+      variants,
+    };
+  };
+
   const handleSearch = async (query: string) => {
     const normalizedQuery = query.trim().toLowerCase();
     setLastQuery(query);
@@ -30,8 +111,12 @@ export const SearchPage: React.FC = () => {
       setLoading(true);
       setHasSearched(true);
       setError(null);
-      const results = await youtubeApi.searchMusicVideos(query, 20);
+      setSearchHint(null);
+      const { results, usedFallback, variants } = await searchWithFallback(query);
       setSearchResults(results);
+      if (usedFallback && variants.length > 1) {
+        setSearchHint(`Smart matching used for better results (tried: ${variants.slice(0, 3).join(' • ')})`);
+      }
       localStorage.setItem(`${SEARCH_CACHE_PREFIX}${normalizedQuery}`, JSON.stringify({ results, cachedAt: Date.now() }));
     } catch (err) {
       console.error('Error searching videos:', err);
@@ -42,6 +127,7 @@ export const SearchPage: React.FC = () => {
           if (Array.isArray(parsed.results) && parsed.results.length > 0) {
             setSearchResults(parsed.results);
             setError('Showing cached results. Connect to refresh.');
+            setSearchHint(null);
             return;
           }
         }
@@ -130,6 +216,7 @@ export const SearchPage: React.FC = () => {
           <>
             <div className="mb-6">
               <p className="text-blue-100/75">{error}</p>
+              {searchHint && <p className="text-blue-100/65 text-sm mt-2">{searchHint}</p>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {searchResults.map((video) => (
@@ -156,6 +243,7 @@ export const SearchPage: React.FC = () => {
               <p className="text-blue-100/75">
                 Found {searchResults.length} results
               </p>
+              {searchHint && <p className="text-blue-100/65 text-sm mt-2">{searchHint}</p>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {searchResults.map((video) => (
