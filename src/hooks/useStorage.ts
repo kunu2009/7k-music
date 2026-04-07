@@ -2,6 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { storage } from '@/utils/storage';
 import { YouTubeVideo, Playlist } from '@/types';
 
+function sortPlaylists(playlists: Playlist[]) {
+  return [...playlists].sort((a, b) => {
+    const aOrder = a.order ?? Number.MAX_SAFE_INTEGER;
+    const bOrder = b.order ?? Number.MAX_SAFE_INTEGER;
+    if (aOrder === bOrder) {
+      return b.updatedAt.localeCompare(a.updatedAt);
+    }
+    return aOrder - bOrder;
+  });
+}
+
 export function useFavorites() {
   const [favorites, setFavorites] = useState<YouTubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,94 +86,214 @@ export function usePlaylists() {
   const createPlaylist = useCallback(async (name: string) => {
     try {
       const playlist = await storage.createPlaylist(name);
-      await loadPlaylists();
+      setPlaylists((prev) => sortPlaylists([...prev, playlist]));
       return playlist;
     } catch (error) {
       console.error('Error creating playlist:', error);
       return undefined;
     }
-  }, [loadPlaylists]);
+  }, []);
 
   const deletePlaylist = useCallback(async (id: string) => {
     try {
+      setPlaylists((prev) => prev.filter((playlist) => playlist.id !== id));
       await storage.deletePlaylist(id);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error deleting playlist:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
   const renamePlaylist = useCallback(async (id: string, name: string) => {
     try {
+      const updatedAt = new Date().toISOString();
+      setPlaylists((prev) =>
+        sortPlaylists(
+          prev.map((playlist) =>
+            playlist.id === id
+              ? {
+                  ...playlist,
+                  name,
+                  updatedAt,
+                }
+              : playlist
+          )
+        )
+      );
       await storage.renamePlaylist(id, name);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error renaming playlist:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
   const duplicatePlaylist = useCallback(async (id: string) => {
     try {
       const playlist = await storage.duplicatePlaylist(id);
-      await loadPlaylists();
+      setPlaylists((prev) => sortPlaylists([...prev, playlist]));
       return playlist;
     } catch (error) {
       console.error('Error duplicating playlist:', error);
       return undefined;
     }
-  }, [loadPlaylists]);
+  }, []);
 
   const addToPlaylist = useCallback(async (playlistId: string, video: YouTubeVideo) => {
     try {
+      let changed = false;
+      const updatedAt = new Date().toISOString();
+      setPlaylists((prev) =>
+        sortPlaylists(
+          prev.map((playlist) => {
+            if (playlist.id !== playlistId) return playlist;
+            if (playlist.videos.some((item) => item.id === video.id)) {
+              return playlist;
+            }
+
+            changed = true;
+            return {
+              ...playlist,
+              videos: [...playlist.videos, video],
+              updatedAt,
+            };
+          })
+        )
+      );
+
+      if (!changed) {
+        return;
+      }
+
       await storage.addToPlaylist(playlistId, video);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error adding to playlist:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
   const removeFromPlaylist = useCallback(async (playlistId: string, videoId: string) => {
     try {
+      const updatedAt = new Date().toISOString();
+      setPlaylists((prev) =>
+        sortPlaylists(
+          prev.map((playlist) =>
+            playlist.id === playlistId
+              ? {
+                  ...playlist,
+                  videos: playlist.videos.filter((video) => video.id !== videoId),
+                  updatedAt,
+                }
+              : playlist
+          )
+        )
+      );
       await storage.removeFromPlaylist(playlistId, videoId);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error removing from playlist:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
   const removeManyFromPlaylist = useCallback(async (playlistId: string, videoIds: string[]) => {
     try {
+      const removeSet = new Set(videoIds);
+      const updatedAt = new Date().toISOString();
+      setPlaylists((prev) =>
+        sortPlaylists(
+          prev.map((playlist) =>
+            playlist.id === playlistId
+              ? {
+                  ...playlist,
+                  videos: playlist.videos.filter((video) => !removeSet.has(video.id)),
+                  updatedAt,
+                }
+              : playlist
+          )
+        )
+      );
       await storage.removeManyFromPlaylist(playlistId, videoIds);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error removing multiple videos from playlist:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
   const replacePlaylistVideos = useCallback(async (playlistId: string, videos: YouTubeVideo[]) => {
     try {
+      const updatedAt = new Date().toISOString();
+      setPlaylists((prev) =>
+        sortPlaylists(
+          prev.map((playlist) =>
+            playlist.id === playlistId
+              ? {
+                  ...playlist,
+                  videos,
+                  updatedAt,
+                }
+              : playlist
+          )
+        )
+      );
       await storage.replacePlaylistVideos(playlistId, videos);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error replacing playlist videos:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
   const reorderPlaylists = useCallback(async (playlistIdsInOrder: string[]) => {
     try {
+      setPlaylists((prev) =>
+        sortPlaylists(
+          prev.map((playlist) => {
+            const order = playlistIdsInOrder.indexOf(playlist.id);
+            if (order === -1) return playlist;
+            return {
+              ...playlist,
+              order,
+            };
+          })
+        )
+      );
       await storage.reorderPlaylists(playlistIdsInOrder);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error reordering playlists:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
   const reorderPlaylistVideos = useCallback(async (playlistId: string, videoIdsInOrder: string[]) => {
     try {
+      const updatedAt = new Date().toISOString();
+      setPlaylists((prev) =>
+        sortPlaylists(
+          prev.map((playlist) => {
+            if (playlist.id !== playlistId) return playlist;
+
+            const byId = new Map(playlist.videos.map((video) => [video.id, video]));
+            const reordered = videoIdsInOrder
+              .map((videoId) => byId.get(videoId))
+              .filter((video): video is YouTubeVideo => !!video);
+
+            const includedIds = new Set(reordered.map((video) => video.id));
+            for (const video of playlist.videos) {
+              if (!includedIds.has(video.id)) {
+                reordered.push(video);
+              }
+            }
+
+            return {
+              ...playlist,
+              videos: reordered,
+              updatedAt,
+            };
+          })
+        )
+      );
       await storage.reorderPlaylistVideos(playlistId, videoIdsInOrder);
-      await loadPlaylists();
     } catch (error) {
       console.error('Error reordering playlist videos:', error);
+      await loadPlaylists();
     }
   }, [loadPlaylists]);
 
