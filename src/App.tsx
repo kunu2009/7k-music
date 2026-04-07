@@ -7,6 +7,7 @@ import { MiniPlayer } from '@/components/MiniPlayer';
 import { PlayerToast } from '@/components/PlayerToast';
 import { AppNoticeToast } from '@/components/AppNoticeToast';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
+import { PWAUpdatePrompt } from '@/components/PWAUpdatePrompt';
 import { SeoManager } from '@/components/SeoManager';
 import { HomePage } from '@/pages/HomePage';
 import { SearchPage } from '@/pages/SearchPage';
@@ -200,6 +201,7 @@ function PlayerWrapper() {
 
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
+      <PWAUpdatePrompt />
       <PlayerToast message={playerNotice} />
       <AppNoticeToast />
 
