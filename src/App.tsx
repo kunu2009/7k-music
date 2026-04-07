@@ -5,6 +5,7 @@ import { Navigation } from '@/components/Navigation';
 import { NetworkBanner } from '@/components/NetworkBanner';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { PlayerToast } from '@/components/PlayerToast';
+import { AppNoticeToast } from '@/components/AppNoticeToast';
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt';
 import { SeoManager } from '@/components/SeoManager';
 import { HomePage } from '@/pages/HomePage';
@@ -200,6 +201,7 @@ function PlayerWrapper() {
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
       <PlayerToast message={playerNotice} />
+      <AppNoticeToast />
 
       {/* Mini Player - Hide on Now Playing page */}
       {currentVideo && !isNowPlayingPage && (

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { storage } from '@/utils/storage';
 import { YouTubeVideo, Playlist } from '@/types';
+import { emitAppNotice } from '@/utils/appNotice';
 
 function sortPlaylists(playlists: Playlist[]) {
   return [...playlists].sort((a, b) => {
@@ -67,6 +68,14 @@ export function useFavorites() {
 export function usePlaylists() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
+  const reorderPlaylistsTimerRef = useRef<number | null>(null);
+  const pendingPlaylistOrderRef = useRef<string[] | null>(null);
+  const reorderVideosTimersRef = useRef<Record<string, number>>({});
+  const pendingVideoOrdersRef = useRef<Record<string, string[]>>({});
+
+  const notifyPlaylistPersistError = useCallback((operation: string) => {
+    emitAppNotice(`Could not ${operation}. We reloaded your playlists.`);
+  }, []);
 
   const loadPlaylists = useCallback(async () => {
     try {
@@ -83,6 +92,75 @@ export function usePlaylists() {
     loadPlaylists();
   }, [loadPlaylists]);
 
+  useEffect(() => {
+    return () => {
+      if (reorderPlaylistsTimerRef.current) {
+        window.clearTimeout(reorderPlaylistsTimerRef.current);
+      }
+
+      Object.values(reorderVideosTimersRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+    };
+  }, []);
+
+  const schedulePersistPlaylistOrder = useCallback((playlistIdsInOrder: string[]) => {
+    pendingPlaylistOrderRef.current = playlistIdsInOrder;
+
+    if (reorderPlaylistsTimerRef.current) {
+      window.clearTimeout(reorderPlaylistsTimerRef.current);
+    }
+
+    reorderPlaylistsTimerRef.current = window.setTimeout(() => {
+      const pendingOrder = pendingPlaylistOrderRef.current;
+      pendingPlaylistOrderRef.current = null;
+      reorderPlaylistsTimerRef.current = null;
+
+      if (!pendingOrder) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          await storage.reorderPlaylists(pendingOrder);
+        } catch (error) {
+          console.error('Error persisting playlist order:', error);
+          notifyPlaylistPersistError('save playlist order');
+          await loadPlaylists();
+        }
+      })();
+    }, 280);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
+
+  const schedulePersistPlaylistVideoOrder = useCallback((playlistId: string, videoIdsInOrder: string[]) => {
+    pendingVideoOrdersRef.current[playlistId] = videoIdsInOrder;
+
+    const existingTimer = reorderVideosTimersRef.current[playlistId];
+    if (existingTimer) {
+      window.clearTimeout(existingTimer);
+    }
+
+    reorderVideosTimersRef.current[playlistId] = window.setTimeout(() => {
+      const pendingOrder = pendingVideoOrdersRef.current[playlistId];
+      delete pendingVideoOrdersRef.current[playlistId];
+      delete reorderVideosTimersRef.current[playlistId];
+
+      if (!pendingOrder) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          await storage.reorderPlaylistVideos(playlistId, pendingOrder);
+        } catch (error) {
+          console.error('Error persisting playlist video order:', error);
+          notifyPlaylistPersistError('save song order');
+          await loadPlaylists();
+        }
+      })();
+    }, 280);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
+
   const createPlaylist = useCallback(async (name: string) => {
     try {
       const playlist = await storage.createPlaylist(name);
@@ -90,9 +168,10 @@ export function usePlaylists() {
       return playlist;
     } catch (error) {
       console.error('Error creating playlist:', error);
+      notifyPlaylistPersistError('create playlist');
       return undefined;
     }
-  }, []);
+  }, [notifyPlaylistPersistError]);
 
   const deletePlaylist = useCallback(async (id: string) => {
     try {
@@ -100,9 +179,10 @@ export function usePlaylists() {
       await storage.deletePlaylist(id);
     } catch (error) {
       console.error('Error deleting playlist:', error);
+      notifyPlaylistPersistError('delete playlist');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
 
   const renamePlaylist = useCallback(async (id: string, name: string) => {
     try {
@@ -123,9 +203,10 @@ export function usePlaylists() {
       await storage.renamePlaylist(id, name);
     } catch (error) {
       console.error('Error renaming playlist:', error);
+      notifyPlaylistPersistError('rename playlist');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
 
   const duplicatePlaylist = useCallback(async (id: string) => {
     try {
@@ -134,9 +215,10 @@ export function usePlaylists() {
       return playlist;
     } catch (error) {
       console.error('Error duplicating playlist:', error);
+      notifyPlaylistPersistError('duplicate playlist');
       return undefined;
     }
-  }, []);
+  }, [notifyPlaylistPersistError]);
 
   const addToPlaylist = useCallback(async (playlistId: string, video: YouTubeVideo) => {
     try {
@@ -167,9 +249,10 @@ export function usePlaylists() {
       await storage.addToPlaylist(playlistId, video);
     } catch (error) {
       console.error('Error adding to playlist:', error);
+      notifyPlaylistPersistError('add song to playlist');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
 
   const removeFromPlaylist = useCallback(async (playlistId: string, videoId: string) => {
     try {
@@ -190,9 +273,10 @@ export function usePlaylists() {
       await storage.removeFromPlaylist(playlistId, videoId);
     } catch (error) {
       console.error('Error removing from playlist:', error);
+      notifyPlaylistPersistError('remove song from playlist');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
 
   const removeManyFromPlaylist = useCallback(async (playlistId: string, videoIds: string[]) => {
     try {
@@ -214,9 +298,10 @@ export function usePlaylists() {
       await storage.removeManyFromPlaylist(playlistId, videoIds);
     } catch (error) {
       console.error('Error removing multiple videos from playlist:', error);
+      notifyPlaylistPersistError('remove selected songs');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
 
   const replacePlaylistVideos = useCallback(async (playlistId: string, videos: YouTubeVideo[]) => {
     try {
@@ -237,9 +322,10 @@ export function usePlaylists() {
       await storage.replacePlaylistVideos(playlistId, videos);
     } catch (error) {
       console.error('Error replacing playlist videos:', error);
+      notifyPlaylistPersistError('restore playlist songs');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError]);
 
   const reorderPlaylists = useCallback(async (playlistIdsInOrder: string[]) => {
     try {
@@ -255,12 +341,13 @@ export function usePlaylists() {
           })
         )
       );
-      await storage.reorderPlaylists(playlistIdsInOrder);
+      schedulePersistPlaylistOrder(playlistIdsInOrder);
     } catch (error) {
       console.error('Error reordering playlists:', error);
+      notifyPlaylistPersistError('reorder playlists');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError, schedulePersistPlaylistOrder]);
 
   const reorderPlaylistVideos = useCallback(async (playlistId: string, videoIdsInOrder: string[]) => {
     try {
@@ -290,12 +377,13 @@ export function usePlaylists() {
           })
         )
       );
-      await storage.reorderPlaylistVideos(playlistId, videoIdsInOrder);
+      schedulePersistPlaylistVideoOrder(playlistId, videoIdsInOrder);
     } catch (error) {
       console.error('Error reordering playlist videos:', error);
+      notifyPlaylistPersistError('reorder playlist songs');
       await loadPlaylists();
     }
-  }, [loadPlaylists]);
+  }, [loadPlaylists, notifyPlaylistPersistError, schedulePersistPlaylistVideoOrder]);
 
   return {
     playlists,
